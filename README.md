@@ -342,9 +342,7 @@ Sensitive configuration stored securely in AWS Systems Manager:
 ```bash
 # Check Python path and dependencies
 cd eks-agentcore
-python3 -c "import sys; print(sys.
-
-# path)"
+python3 -c "import sys; print(sys.path)"
 pip install -r requirements.txt
 ```
 

@@ -1,47 +1,124 @@
-# Telco Multi Agent Collaboration Pattern
+# Telco Multi-Agent Collaboration Pattern
 
-## 🔗 Key Relationships:
+## Overview
 
-Telco Containers (UPF, AMF, SMF) + Agentic Sidecar  → AWS Agent(s): eks-agent, outposts-agent, vpc-agent, prometheus-agent
-• Each Telco container + agentic sidecar pair communicate with AWS Agent(s)
-• Agentic sidecar will communicate with AWS Agent(s) for information exchange and correllation
+This document describes the multi-agent collaboration pattern for telecommunications infrastructure management using AWS AgentCore. The architecture enables intelligent 5G network management through specialized AWS agents that work together to provide comprehensive telco operations.
 
-AWS Agent(s) are connected 1:1 with AgentCore Gateways
-• All AWS Agents has it's own AgentCore Gateways
-• AgentCore Gateways has multiple tools related with it's specific domain
+## Architecture Diagram
 
-AgentCore Gateways → tools(), the tools are specific for the Agent's domain
-• eks-agent connected to eks-agentcore-gateway which has multiple tools: eks_controlplane_upgrade(), eks_workernode_upgrade(), eks_workernode_scaleout(), eks_workernode_scalein(), etc.
-• outposts-agent connected to outposts-agentcore-gateway which has multiple tools: outposts_nic_firmware_update(), outposts_hardware_initiate_fru(), outposts_health_check(), etc.
-• vpc-agent connected to vpc-agentcore-gateway which has multiple tools: vpc_reachability_check(), vpc_create_tgw(), vpc_start_flowlogs(), vpc_check_routetable(), etc.
-• prometheus-agent connected to prometheus-agentcore-gateway which has multiple tools: prometheus_query(), prometheus_range_query(), prometheus_list_metrics(), etc.
+![Telco-AgentCore Multi-Agent Collaboration](diagrams/telco-agentcore-multiagentscollaboration.png)
 
-## 🛠️ Key Relationships Diagram:
-![Telco-AgentCore-MAC](diagrams/telco-agentcore-multiagentscollaboration.png)
+## Core Components
 
-## 🔗 Key Architecture Components:
+### 1. Telco Network Functions
 
-🏗️ Telco Containers + Agentic Sidecars:
-• **UPF, AMF, SMF**: Core 5G network functions
-• **UERANSIM**: 5G UE simulator for testing
-• **gNB**: 5G Radio Access Network base station
-• **Agentic Sidecars**: Handle AWS communication and correlation
+The 5G core network functions that form the foundation of the telecommunications infrastructure:
 
-🤖 AWS Agents (1:1 with AgentCore Gateways):
-• **eks-agent** → EKS management and operations
-• **outposts-agent** → Outposts hardware and infrastructure
-• **vpc-agent** → VPC networking and connectivity
-• **prometheus-agent** → Monitoring and metrics
+- **UPF (User Plane Function)** - Handles user data traffic routing and forwarding
+- **AMF (Access and Mobility Management Function)** - Manages device registration and mobility
+- **SMF (Session Management Function)** - Handles session establishment and management
+- **vCU (RAN Centralized Unit Function)** - Handles Radio Access Network higher portions of Layer 2 (L2) and all of Layer 3 (L3) functions
+- **vDU (RAN Distributed Unit Function)** - Handles Radio Access Network Layer 1 (L1) and lower portions of Layer 2 (L2) functions
 
-🛠️ AgentCore Gateways with Domain-Specific Tools:
-• **EKS Gateway**: Cluster upgrades, node scaling, worker management
-• **Outposts Gateway**: Hardware updates, FRU replacement, health checks
-• **VPC Gateway**: Connectivity tests, transit gateway, flow logs, routing
-• **Prometheus Gateway**: Metric queries, range queries, metric discovery
+### 2. Agentic Sidecars
 
-📡 Information Exchange & Correlation:
-• Bidirectional communication between all components
-• Real-time monitoring and management capabilities
-• Cross-domain correlation for holistic 5G network management
+Each telco container is paired with an intelligent sidecar that:
 
-This architecture enables intelligent 5G network management through AWS-native agents and tools.
+- Monitors container health and performance
+- Communicates with AWS agents for infrastructure management
+- Provides correlation between telco functions and AWS services
+- Enables automated remediation and optimization
+
+### 3. AWS Specialized Agents
+
+Four domain-specific agents handle different aspects of infrastructure management:
+
+#### EKS Agent (`eks-agent`)
+- **Purpose**: Amazon Elastic Kubernetes Service management
+- **Gateway**: `eks-agentcore-gateway`
+- **Key Tools**:
+  - `eks_controlplane_upgrade()` - Upgrade EKS control plane
+  - `eks_workernode_upgrade()` - Update worker node versions
+  - `eks_workernode_scaleout()` - Scale out worker nodes
+  - `eks_workernode_scalein()` - Scale in worker nodes
+
+#### Outposts Agent (`outposts-agent`)
+- **Purpose**: AWS Outposts hardware and infrastructure management
+- **Gateway**: `outposts-agentcore-gateway`
+- **Key Tools**:
+  - `outposts_nic_firmware_update()` - Update network interface firmware
+  - `outposts_hardware_initiate_fru()` - Initiate field replaceable unit replacement
+  - `outposts_health_check()` - Perform comprehensive health checks
+
+#### VPC Agent (`vpc-agent`)
+- **Purpose**: Virtual Private Cloud networking and connectivity
+- **Gateway**: `vpc-agentcore-gateway`
+- **Key Tools**:
+  - `vpc_reachability_check()` - Test network connectivity
+  - `vpc_create_tgw()` - Create transit gateway connections
+  - `vpc_start_flowlogs()` - Enable VPC flow logging
+  - `vpc_check_routetable()` - Validate routing configurations
+
+#### Prometheus Agent (`prometheus-agent`)
+- **Purpose**: Monitoring and observability with Amazon Managed Prometheus
+- **Gateway**: `prometheus-agentcore-gateway`
+- **Key Tools**:
+  - `prometheus_query()` - Execute PromQL queries
+  - `prometheus_range_query()` - Perform time-range queries
+  - `prometheus_list_metrics()` - Discover available metrics
+
+## Communication Flow
+
+### 1. Telco Container ↔ Agentic Sidecar
+- **Relationship**: 1:1 pairing
+- **Communication**: Local container networking
+- **Purpose**: Health monitoring, performance metrics, operational status
+
+### 2. Agentic Sidecar ↔ AWS Agents
+- **Relationship**: Many-to-many
+- **Communication**: Secure API calls via AgentCore
+- **Purpose**: Infrastructure management, correlation, automated remediation
+
+### 3. AWS Agent ↔ AgentCore Gateway
+- **Relationship**: 1:1 dedicated connection
+- **Communication**: AgentCore protocol
+- **Purpose**: Tool execution, memory management, authentication
+
+## Key Benefits
+
+### Intelligent Automation
+- Automated infrastructure management based on telco workload requirements
+- Proactive issue detection and remediation
+- Cross-domain correlation for holistic network management
+
+### Scalability
+- Independent scaling of telco functions and infrastructure agents
+- Distributed decision-making across specialized domains
+- Efficient resource utilization through intelligent orchestration
+
+### Observability
+- Comprehensive monitoring across telco and infrastructure layers
+- Real-time metrics and alerting
+- Historical analysis and trend identification
+
+### Reliability
+- Fault isolation between telco functions and infrastructure management
+- Automated failover and recovery procedures
+- Continuous health monitoring and validation
+
+## Implementation Considerations
+
+### Security
+- Secure communication channels between all components
+- Role-based access control for agent operations
+- Audit logging for all infrastructure changes
+
+### Performance
+- Low-latency communication for real-time operations
+- Efficient resource utilization across all agents
+- Optimized tool execution and response times
+
+### Maintenance
+- Independent deployment and updates for each agent
+- Centralized configuration management
+- Comprehensive testing and validation procedures

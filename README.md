@@ -37,15 +37,38 @@ agentcore-telco/
 │   ├── run_streamlit.sh         # Streamlit launcher
 │   ├── Dockerfile.runtime       # Container configuration
 │   ├── LICENSE                  # License file
-│   └── streamlit/               # Streamlit demo application
+│   └── streamlit/               # Streamlit web application
 │       ├── README.md
 │       ├── demo_streamlit.py
 │       ├── run_streamlit.sh
 │       └── streamlit_app.py
 ├── vpc-agentcore/               # VPC Agent (same structure)
 ├── outposts-agentcore/          # Outposts Agent (same structure)
-└── prometheus-agentcore/        # Prometheus Agent (same structure)
+├── prometheus-agentcore/        # Prometheus Agent (same structure)
+└── agent2agent/                 # Agent2Agent protocol integration
+    ├── README.md                # A2A documentation
+    ├── QUICK_START.md           # Quick start guide
+    ├── docs/                    # Integration guides
+    ├── examples/                # Example scripts
+    └── wrappers/                # A2A wrapper classes
 ```
+
+## 🌐 Agent2Agent (A2A) Integration
+
+This project includes **Agent2Agent protocol integration**, enabling cross-agent communication and collaboration:
+
+- **Enhanced Troubleshooting** - Agents collaborate for comprehensive analysis
+- **Cross-Domain Context** - EKS ↔ VPC ↔ Prometheus ↔ Outposts communication
+- **Automated Workflows** - Multi-agent problem resolution
+- **Comprehensive Insights** - Combined analysis from multiple agents
+
+### Quick A2A Example
+```bash
+# Run the A2A integration example
+uv run python run_a2a_example.py
+```
+
+See [agent2agent/README.md](agent2agent/README.md) for complete A2A documentation.
 
 ## 🚀 Quick Start
 
@@ -68,7 +91,7 @@ agentcore-telco/
 **Additional Libraries:**
 - **ddgs** - DuckDuckGo search integration
 - **fastapi/uvicorn** - Web API framework
-- **streamlit** - Web UI for demos
+- **streamlit** - Web UI for applications
 - **requests** - HTTP client library
 
 ### Installation

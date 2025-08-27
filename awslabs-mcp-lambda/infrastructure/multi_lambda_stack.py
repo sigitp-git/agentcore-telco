@@ -41,6 +41,13 @@ class MultiMcpLambdaStack(Stack):
         lambda_dir = f"lambda-{server_id}"
         self._prepare_lambda_code(lambda_dir, server_id, config)
 
+        # Filter out reserved environment variables
+        env_vars = config.get('env', {}).copy()
+        reserved_vars = ['AWS_REGION', 'AWS_DEFAULT_REGION', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN']
+        for var in reserved_vars:
+            if var in env_vars:
+                del env_vars[var]
+
         # Create the Lambda function
         lambda_function = lambda_python.PythonFunction(
             self,
@@ -54,7 +61,7 @@ class MultiMcpLambdaStack(Stack):
                 "LOG_LEVEL": "INFO",
                 "PYTHONUNBUFFERED": "1",
                 "MCP_SERVER_ID": server_id,
-                **config.get('env', {})
+                **env_vars
             },
             description=f"MCP Server: {config['name']}",
             function_name=f"mcp-server-{server_id}",

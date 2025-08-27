@@ -1,0 +1,305 @@
+[
+  {
+    "name": "list_monitored_services",
+    "description": "List all services monitored by AWS Application Signals.\n\n    Use this tool to:\n    - Get an overview of all monitored services\n    - See service names, types, and key attributes\n    - Identify which services are being tracked\n    - Count total number of services in your environment\n\n    Returns a formatted list showing:\n    - Service name and type\n    - Key attributes (Environment, Platform, etc.)\n    - Total count of services\n\n    This is typically the first tool to use when starting monitoring or investigation.\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "title": "list_monitored_servicesArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "list_monitored_servicesOutput"
+    }
+  },
+  {
+    "name": "get_service_detail",
+    "description": "Get detailed information about a specific Application Signals service.\n\n    Use this tool when you need to:\n    - Understand a service's configuration and setup\n    - Understand where this servive is deployed and where it is running such as EKS, Lambda, etc.\n    - See what metrics are available for a service\n    - Find log groups associated with the service\n    - Get service metadata and attributes\n\n    Returns comprehensive details including:\n    - Key attributes (Type, Environment, Platform)\n    - Available CloudWatch metrics with namespaces\n    - Metric dimensions and types\n    - Associated log groups for debugging\n\n    This tool is essential before querying specific metrics, as it shows\n    which metrics are available for the service.\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "description": "Name of the service to get details for (case-sensitive)",
+          "title": "Service Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "service_name"
+      ],
+      "title": "get_service_detailArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "get_service_detailOutput"
+    }
+  },
+  {
+    "name": "query_service_metrics",
+    "description": "Get CloudWatch metrics for a specific Application Signals service.\n\n    Use this tool to:\n    - Analyze service performance (latency, throughput)\n    - Check error rates and reliability\n    - View trends over time\n    - Get both standard statistics (Average, Max) and percentiles (p99, p95)\n\n    Common metric names:\n    - 'Latency': Response time in milliseconds\n    - 'Error': Percentage of failed requests\n    - 'Fault': Percentage of server errors (5xx)\n\n    Returns:\n    - Summary statistics (latest, average, min, max)\n    - Recent data points with timestamps\n    - Both standard and percentile values when available\n\n    The tool automatically adjusts the granularity based on time range:\n    - Up to 3 hours: 1-minute resolution\n    - Up to 24 hours: 5-minute resolution\n    - Over 24 hours: 1-hour resolution\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "description": "Name of the service to get metrics for (case-sensitive)",
+          "title": "Service Name",
+          "type": "string"
+        },
+        "metric_name": {
+          "description": "Specific metric name (e.g., Latency, Error, Fault). Leave empty to list available metrics",
+          "title": "Metric Name",
+          "type": "string"
+        },
+        "statistic": {
+          "default": "Average",
+          "description": "Standard statistic type (Average, Sum, Maximum, Minimum, SampleCount)",
+          "title": "Statistic",
+          "type": "string"
+        },
+        "extended_statistic": {
+          "default": "p99",
+          "description": "Extended statistic (p99, p95, p90, p50, etc)",
+          "title": "Extended Statistic",
+          "type": "string"
+        },
+        "hours": {
+          "default": 1,
+          "description": "Number of hours to look back (default 1, max 168 for 1 week)",
+          "title": "Hours",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "service_name",
+        "metric_name"
+      ],
+      "title": "query_service_metricsArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "query_service_metricsOutput"
+    }
+  },
+  {
+    "name": "get_slo",
+    "description": "Get detailed information about a specific Service Level Objective (SLO).\n\n    Use this tool to:\n    - Get comprehensive SLO configuration details\n    - Understand what metrics the SLO monitors\n    - See threshold values and comparison operators\n    - Extract operation names and key attributes for trace queries\n    - Identify dependency configurations\n    - Review attainment goals and burn rate settings\n\n    Returns detailed information including:\n    - SLO name, description, and metadata\n    - Metric configuration (for period-based or request-based SLOs)\n    - Key attributes and operation names\n    - Metric type (LATENCY or AVAILABILITY)\n    - Threshold values and comparison operators\n    - Goal configuration (attainment percentage, time interval)\n    - Burn rate configurations\n\n    This tool is essential for:\n    - Understanding why an SLO was breached\n    - Getting the exact operation name to query traces\n    - Identifying the metrics and thresholds being monitored\n    - Planning remediation based on SLO configuration\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "slo_id": {
+          "description": "The ARN or name of the SLO to retrieve",
+          "title": "Slo Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slo_id"
+      ],
+      "title": "get_sloArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "get_sloOutput"
+    }
+  },
+  {
+    "name": "search_transaction_spans",
+    "description": "Executes a CloudWatch Logs Insights query for transaction search (100% sampled trace data).\n\n    IMPORTANT: If log_group_name is not provided use 'aws/spans' as default cloudwatch log group name.\n    The volume of returned logs can easily overwhelm the agent context window. Always include a limit in the query\n    (| limit 50) or using the limit parameter.\n\n    Usage:\n    \"aws/spans\" log group stores OpenTelemetry Spans data with many attributes for all monitored services.\n    This provides 100% sampled data vs X-Ray's 5% sampling, giving more accurate results.\n    User can write CloudWatch Logs Insights queries to group, list attribute with sum, avg.\n\n    ```\n    FILTER attributes.aws.local.service = \"customers-service-java\" and attributes.aws.local.environment = \"eks:demo/default\" and attributes.aws.remote.operation=\"InvokeModel\"\n    | STATS sum(`attributes.gen_ai.usage.output_tokens`) as `avg_output_tokens` by `attributes.gen_ai.request.model`, `attributes.aws.local.service`,bin(1h)\n    | DISPLAY avg_output_tokens, `attributes.gen_ai.request.model`, `attributes.aws.local.service`\n    ```\n\n    Returns:\n    --------\n        A dictionary containing the final query results, including:\n            - status: The current status of the query (e.g., Scheduled, Running, Complete, Failed, etc.)\n            - results: A list of the actual query results if the status is Complete.\n            - statistics: Query performance statistics\n            - messages: Any informational messages about the query\n            - transaction_search_status: Information about transaction search availability\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "log_group_name": {
+          "default": "",
+          "description": "CloudWatch log group name (defaults to \"aws/spans\" if not provided)",
+          "title": "Log Group Name",
+          "type": "string"
+        },
+        "start_time": {
+          "default": "",
+          "description": "Start time in ISO 8601 format (e.g., \"2025-04-19T20:00:00+00:00\")",
+          "title": "Start Time",
+          "type": "string"
+        },
+        "end_time": {
+          "default": "",
+          "description": "End time in ISO 8601 format (e.g., \"2025-04-19T21:00:00+00:00\")",
+          "title": "End Time",
+          "type": "string"
+        },
+        "query_string": {
+          "default": "",
+          "description": "CloudWatch Logs Insights query string",
+          "title": "Query String",
+          "type": "string"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of results to return",
+          "title": "Limit"
+        },
+        "max_timeout": {
+          "default": 30,
+          "description": "Maximum time in seconds to wait for query completion",
+          "title": "Max Timeout",
+          "type": "integer"
+        }
+      },
+      "title": "search_transaction_spansArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "additionalProperties": true,
+          "title": "Result",
+          "type": "object"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "search_transaction_spansOutput"
+    }
+  },
+  {
+    "name": "list_slis",
+    "description": "Get SLI (Service Level Indicator) status and SLO compliance for all services.\n\n    Use this tool to:\n    - Check overall system health at a glance\n    - Identify services with breached SLOs (Service Level Objectives)\n    - See which specific SLOs are failing\n    - Prioritize which services need immediate attention\n    - Monitor SLO compliance trends\n\n    Returns a comprehensive report showing:\n    - Summary counts (total, healthy, breached, insufficient data)\n    - Detailed list of breached services with:\n      - Service name and environment\n      - Number and names of breached SLOs\n      - Specific SLO violations\n    - List of healthy services\n    - Services with insufficient data\n\n    This is the primary tool for health monitoring and should be used:\n    - At the start of each day\n    - During incident response\n    - For regular health checks\n    - When investigating \"what is the root cause of breaching SLO\" questions\n\n    Status meanings:\n    - OK: All SLOs are being met\n    - BREACHED: One or more SLOs are violated\n    - INSUFFICIENT_DATA: Not enough data to determine status\n\n    To investigate breached SLOs, follow these steps:\n    1. Call get_service_level_objective() with SLO name to get the detailed SLI data including Metric statistics\n    2. Find the fault metrics from SLI under the breached SLO\n    3. Build trace query filters using metric dimensions (Operation, RemoteOperation, etc.):\n        - For availability: `service(\"service-name\"){fault = true} AND annotation[aws.local.operation]=\"operation-name\"`\n        - For latency: `service(\"service-name\") AND annotation[aws.local.operation]=\"operation-name\" AND duration > threshold`\n    4. Query traces:\n        - If Transaction Search is enabled: Use search_transaction_spans() for 100% trace visibility\n        - If not enabled: Use query_sampled_traces() with X-Ray (only 5% sampled data - may miss issues)\n    5. The query time window should default to last 3 hours if not specified. Max query time window length is 6 hours\n    6. Analyze the root causes from Exception data in traces\n    7. Include findings in the report and give fix and mitigation suggestions\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "hours": {
+          "default": 24,
+          "description": "Number of hours to look back (default 24, typically use 24 for daily checks)",
+          "title": "Hours",
+          "type": "integer"
+        }
+      },
+      "title": "list_slisArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "list_slisOutput"
+    }
+  },
+  {
+    "name": "query_sampled_traces",
+    "description": "Query AWS X-Ray traces (5% sampled data) to investigate errors and performance issues.\n\n    \u26a0\ufe0f IMPORTANT: This tool uses X-Ray's 5% sampled trace data. For 100% trace visibility,\n    enable Transaction Search and use search_transaction_spans() instead.\n\n    Use this tool to:\n    - Find root causes of errors and faults (with 5% sampling limitations)\n    - Analyze request latency and identify bottlenecks\n    - Understand the requests across multiple services with traces\n    - Debug timeout and dependency issues\n    - Understand service-to-service interactions\n    - Find customer impact from trace result such as Users data or trace attributes such as owner id\n\n    Common filter expressions:\n    - 'service(\"service-name\"){fault = true}': Find all traces with faults (5xx errors) for a service\n    - 'service(\"service-name\")': Filter by specific service\n    - 'duration > 5': Find slow requests (over 5 seconds)\n    - 'http.status = 500': Find specific HTTP status codes\n    - 'annotation[aws.local.operation]=\"GET /owners/*/lastname\"': Filter by specific operation (from metric dimensions)\n    - 'annotation[aws.remote.operation]=\"ListOwners\"': Filter by remote operation name\n    - Combine filters: 'service(\"api\"){fault = true} AND annotation[aws.local.operation]=\"POST /visits\"'\n\n    IMPORTANT: When investigating SLO breaches, use annotation filters with the specific dimension values\n    from the breached metric (e.g., Operation, RemoteOperation) to find traces for that exact operation.\n\n    Returns JSON with trace summaries including:\n    - Trace ID for detailed investigation\n    - Duration and response time\n    - Error/fault/throttle status\n    - HTTP information (method, status, URL)\n    - Service interactions\n    - User information if available\n    - Exception root causes (ErrorRootCauses, FaultRootCauses, ResponseTimeRootCauses)\n\n    Best practices:\n    - Start with recent time windows (last 1-3 hours)\n    - Use filter expressions to narrow down issues and query Fault and Error traces for high priority\n    - Look for patterns in errors or very slow requests\n\n    Returns:\n        JSON string containing trace summaries with error status, duration, and service details\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "start_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Start time in ISO format (e.g., \"2024-01-01T00:00:00Z\"). Defaults to 3 hours ago",
+          "title": "Start Time"
+        },
+        "end_time": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "End time in ISO format (e.g., \"2024-01-01T01:00:00Z\"). Defaults to current time",
+          "title": "End Time"
+        },
+        "filter_expression": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "X-Ray filter expression to narrow results (e.g., service(\"service-name\"){fault = true})",
+          "title": "Filter Expression"
+        },
+        "region": {
+          "default": "us-east-1",
+          "description": "AWS region (default: us-east-1)",
+          "title": "Region",
+          "type": "string"
+        }
+      },
+      "title": "query_sampled_tracesArguments"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "title": "query_sampled_tracesOutput"
+    }
+  }
+]

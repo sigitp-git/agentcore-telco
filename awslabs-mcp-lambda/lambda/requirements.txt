@@ -1,0 +1,2 @@
+# No additional dependencies needed for the wrapper
+# The MCP server dependencies are handled by uvx at runtime

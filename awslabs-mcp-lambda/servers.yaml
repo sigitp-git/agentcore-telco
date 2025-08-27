@@ -1,0 +1,192 @@
+# MCP Server Configurations
+# Each server will get its own Lambda function
+
+servers:
+  # Core AWS Labs MCP Servers
+  core-mcp:
+    name: "AWS Labs Core MCP Server"
+    description: "Core AWS functionality and prompt understanding"
+    command: "uvx"
+    args: ["awslabs.core-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 60
+    memory: 1024
+
+  aws-pricing:
+    name: "AWS Pricing MCP Server"
+    description: "Get AWS service pricing information"
+    command: "uvx"
+    args: ["awslabs.aws-pricing-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+      AWS_REGION: "us-east-1"
+    timeout: 60
+    memory: 1024
+
+  aws-docs:
+    name: "AWS Documentation MCP Server"
+    description: "Search and retrieve AWS documentation"
+    command: "uvx"
+    args: ["awslabs.aws-documentation-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 60
+    memory: 1024
+
+  frontend-mcp:
+    name: "AWS Labs Frontend MCP Server"
+    description: "Frontend development tools and React documentation"
+    command: "uvx"
+    args: ["awslabs.frontend-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 60
+    memory: 1024
+
+  aws-location:
+    name: "AWS Location MCP Server"
+    description: "AWS Location Service for geocoding and mapping"
+    command: "uvx"
+    args: ["awslabs.aws-location-mcp-server@latest"]
+    env:
+      AWS_REGION: "us-east-1"
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 60
+    memory: 1024
+
+  git-repo-research:
+    name: "Git Repository Research MCP Server"
+    description: "Advanced git repository analysis and research"
+    command: "uvx"
+    args: ["awslabs.git-repo-research-mcp-server@latest"]
+    env:
+      AWS_REGION: "us-east-1"
+      FASTMCP_LOG_LEVEL: "ERROR"
+      # Note: GITHUB_TOKEN should be set via Lambda environment variables for security
+    timeout: 90
+    memory: 1536
+
+  eks-mcp:
+    name: "AWS EKS MCP Server"
+    description: "Amazon EKS cluster management and troubleshooting"
+    command: "uvx"
+    args: ["awslabs.eks-mcp-server@latest", "--allow-write", "--allow-sensitive-data-access"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 120
+    memory: 2048
+
+  aws-diagram:
+    name: "AWS Diagram MCP Server"
+    description: "Generate AWS architecture diagrams"
+    command: "uvx"
+    args: ["awslabs.aws-diagram-mcp-server"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 90
+    memory: 1536
+
+  prometheus:
+    name: "Prometheus MCP Server"
+    description: "Prometheus metrics and monitoring"
+    command: "uvx"
+    args: ["awslabs.prometheus-mcp-server@latest", "--region", "us-east-1"]
+    env:
+      FASTMCP_LOG_LEVEL: "DEBUG"
+    timeout: 60
+    memory: 1024
+
+  cfn-mcp:
+    name: "AWS CloudFormation MCP Server"
+    description: "CloudFormation template management and operations"
+    command: "uvx"
+    args: ["awslabs.cfn-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 90
+    memory: 1536
+
+  terraform-mcp:
+    name: "Terraform MCP Server"
+    description: "Terraform infrastructure management"
+    command: "uvx"
+    args: ["awslabs.terraform-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 120
+    memory: 2048
+
+  aws-knowledge:
+    name: "AWS Knowledge MCP Server"
+    description: "AWS Knowledge base via proxy"
+    command: "uvx"
+    args: ["mcp-proxy", "--transport", "streamablehttp", "https://knowledge-mcp.global.api.aws"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 60
+    memory: 1024
+
+  cloudwatch-mcp:
+    name: "AWS CloudWatch MCP Server"
+    description: "CloudWatch logs and metrics analysis"
+    command: "uvx"
+    args: ["awslabs.cloudwatch-mcp-server@latest"]
+    env:
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 90
+    memory: 1536
+
+  cloudwatch-appsignals:
+    name: "AWS CloudWatch Application Signals MCP Server"
+    description: "CloudWatch Application Signals monitoring"
+    command: "uvx"
+    args: ["awslabs.cloudwatch-appsignals-mcp-server@latest"]
+    env:
+      AWS_REGION: "us-east-1"
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 90
+    memory: 1536
+
+  ccapi-mcp:
+    name: "AWS Cloud Control API MCP Server"
+    description: "AWS Cloud Control API resource management"
+    command: "uvx"
+    args: ["awslabs.ccapi-mcp-server@latest"]
+    env:
+      DEFAULT_TAGS: "enabled"
+      SECURITY_SCANNING: "enabled"
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 120
+    memory: 2048
+
+  # Third-party MCP Servers
+  github:
+    name: "GitHub MCP Server"
+    description: "GitHub repository and issue management"
+    command: "docker"
+    args: ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"]
+    env:
+      # Note: GITHUB_PERSONAL_ACCESS_TOKEN should be set via Lambda environment variables for security
+      FASTMCP_LOG_LEVEL: "ERROR"
+    timeout: 90
+    memory: 1536
+
+  # Legacy servers (keeping for compatibility)
+  git-repo:
+    name: "Git Repository MCP Server (Legacy)"
+    description: "Basic git repository operations"
+    command: "uvx"
+    args: ["mcp-server-git"]
+    env: {}
+    timeout: 90
+    memory: 1536
+
+  filesystem:
+    name: "Filesystem MCP Server"
+    description: "File system operations (Lambda /tmp only)"
+    command: "uvx"
+    args: ["mcp-server-filesystem", "/tmp"]
+    env: {}
+    timeout: 30
+    memory: 512

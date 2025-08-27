@@ -2,14 +2,13 @@
 """
 AWS Labs MCP Lambda CDK Application
 
-This creates multiple Lambda functions, one for each MCP server,
-providing 1:1 mapping for better isolation and scaling.
+Creates individual Lambda functions for each MCP server defined in servers.yaml
 """
 
 import aws_cdk as cdk
 import yaml
 import os
-from infrastructure.multi_lambda_stack import MultiMcpLambdaStack
+from infrastructure.mcp_lambda_stack import McpLambdaStack
 
 
 def load_server_configs():
@@ -25,30 +24,24 @@ app = cdk.App()
 config = load_server_configs()
 servers = config.get('servers', {})
 
-# Create the multi-MCP Lambda stack
-stack = MultiMcpLambdaStack(
+# Create the MCP Lambda stack
+stack = McpLambdaStack(
     app, 
-    "MultiMcpLambdaStack",
+    "McpLambdaStack",
     servers=servers,
-    description="AWS Labs MCP Servers - One Lambda per MCP Server"
+    description=f"AWS Labs MCP Servers - {len(servers)} Lambda Functions"
 )
 
-# Output Lambda ARNs for each server
+# Output Lambda ARNs for AgentCore Gateway integration
 for server_id in servers.keys():
+    function_name = f"mcp-server-{server_id}"
+    output_name = f"Mcp{server_id.replace('-', '').title()}LambdaArn"
+    
     cdk.CfnOutput(
         stack,
-        f"Mcp{server_id.replace('-', '').title()}LambdaArn",
+        output_name,
         value=stack.lambda_arns[server_id],
         description=f"Lambda ARN for {servers[server_id]['name']}"
-    )
-
-# Output API Gateway URLs for testing
-for server_id in servers.keys():
-    cdk.CfnOutput(
-        stack,
-        f"Mcp{server_id.replace('-', '').title()}ApiUrl",
-        value=stack.api_urls[server_id],
-        description=f"API Gateway URL for {servers[server_id]['name']} (testing only)"
     )
 
 app.synth()

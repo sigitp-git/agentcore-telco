@@ -155,9 +155,18 @@ class AWSMCPManager:
         """Cleanup MCP clients."""
         for server_name, client in self.mcp_clients.items():
             try:
-                client.stop()
+                # MCPClient.stop() expects context manager arguments
+                client.stop(None, None, None)
             except Exception as e:
                 print(f"⚠️  Error stopping {server_name}: {e}")
+                # Try alternative cleanup methods if available
+                try:
+                    if hasattr(client, '__exit__'):
+                        client.__exit__(None, None, None)
+                    elif hasattr(client, 'close'):
+                        client.close()
+                except Exception as cleanup_error:
+                    print(f"⚠️  Alternative cleanup failed for {server_name}: {cleanup_error}")
 
 class AgentConfig:
     """Configuration settings for the Prometheus Agent."""

@@ -37,6 +37,9 @@ from strands.hooks import AfterInvocationEvent, HookProvider, HookRegistry, Mess
 from strands.models.bedrock import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.stdio import stdio_client, StdioServerParameters
+import subprocess
+import asyncio
 
 # Import AgentCore Memory
 from bedrock_agentcore.memory import MemoryClient
@@ -47,6 +50,115 @@ from bedrock_agentcore.identity.auth import requires_access_token
 
 sts_client = boto3.client('sts')
 
+class AWSMCPManager:
+    """Manages AWS MCP tools integration."""
+    
+    def __init__(self, config_path: str):
+        self.config_path = config_path
+        self.mcp_clients = {}
+        self.mcp_tools = []
+        
+    def load_aws_mcp_config(self):
+        """Load AWS MCP configuration."""
+        try:
+            if not os.path.exists(self.config_path):
+                print(f"⚠️  AWS MCP config file not found at {self.config_path}")
+                return None
+                
+            with open(self.config_path, 'r') as f:
+                config = json.load(f)
+                return config.get('mcpServers', {})
+                
+        except Exception as e:
+            print(f"❌ Error loading AWS MCP config: {e}")
+            return None
+    
+    def initialize_aws_mcp_clients(self):
+        """Initialize MCP clients for enabled AWS servers."""
+        servers = self.load_aws_mcp_config()
+        if not servers:
+            print("ℹ️  No AWS MCP servers found")
+            return
+        
+        enabled_servers = {name: config for name, config in servers.items() 
+                          if not config.get('disabled', False)}
+        
+        print(f"🔧 Initializing {len(enabled_servers)} AWS MCP servers...")
+        
+        for server_name, server_config in enabled_servers.items():
+            try:
+                self._initialize_single_mcp_client(server_name, server_config)
+            except Exception as e:
+                print(f"⚠️  Failed to initialize {server_name}: {e}")
+    
+    def _initialize_single_mcp_client(self, server_name: str, server_config: dict):
+        """Initialize a single MCP client."""
+        command = server_config.get('command', '')
+        args = server_config.get('args', [])
+        env = server_config.get('env', {})
+        
+        if not command:
+            print(f"⚠️  No command specified for {server_name}")
+            return
+        
+        try:
+            # Create environment with current env + server env
+            full_env = os.environ.copy()
+            full_env.update(env)
+            
+            # Create MCP client using stdio
+            server_params = StdioServerParameters(
+                command=command,
+                args=args,
+                env=full_env
+            )
+            client = MCPClient(
+                lambda: stdio_client(server_params)
+            )
+            
+            # Start the client
+            client.start()
+            
+            # Get tools from this client
+            tools = self._get_tools_from_client(client, server_name)
+            
+            self.mcp_clients[server_name] = client
+            self.mcp_tools.extend(tools)
+            
+            print(f"✅ Initialized {server_name} with {len(tools)} tools")
+            
+        except Exception as e:
+            print(f"⚠️  Failed to start {server_name}: {e}")
+            # Continue with other servers even if one fails
+    
+    def _get_tools_from_client(self, client, server_name: str):
+        """Get tools from an MCP client."""
+        try:
+            tools = client.list_tools_sync()
+            if tools:
+                # Add server name prefix to tool names for identification
+                for tool in tools:
+                    if hasattr(tool, 'name'):
+                        tool._original_name = tool.name
+                        tool._server_name = server_name
+                return tools if hasattr(tools, '__iter__') else [tools]
+            return []
+        except Exception as e:
+            print(f"⚠️  Could not get tools from {server_name}: {e}")
+            return []
+    
+    def get_all_aws_tools(self):
+        """Get all tools from AWS MCP clients."""
+        return self.mcp_tools
+    
+    def cleanup(self):
+        """Cleanup MCP clients."""
+        for server_name, client in self.mcp_clients.items():
+            try:
+                client.stop()
+            except Exception as e:
+                print(f"⚠️  Error stopping {server_name}: {e}")
+
 class AgentConfig:
     """Configuration settings for the Prometheus Agent."""
     
@@ -56,6 +168,10 @@ class AgentConfig:
     # MCP Configuration
     ENABLE_MCP_CONFIG = True  # Toggle to enable/disable MCP config loading
     MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'
+    
+    # AWS MCP Configuration
+    ENABLE_AWS_MCP = True  # Toggle to enable/disable AWS MCP integration
+    AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'
     
     # Available Models
     AVAILABLE_MODELS = {
@@ -477,6 +593,22 @@ if mcp_client:
         print("🔄 Continuing without MCP client functionality...")
         mcp_client = None
 
+# Initialize AWS MCP Manager
+aws_mcp_manager = None
+if AgentConfig.ENABLE_AWS_MCP:
+    try:
+        print("🔧 Initializing AWS MCP integration...")
+        aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
+        aws_mcp_manager.initialize_aws_mcp_clients()
+        aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
+        print(f"✅ AWS MCP integration ready with {aws_tools_count} tools")
+    except Exception as e:
+        print(f"⚠️  AWS MCP initialization failed: {e}")
+        print("🔄 Continuing without AWS MCP functionality...")
+        aws_mcp_manager = None
+else:
+    print("ℹ️  AWS MCP integration disabled")
+
 # Configure logging
 logging.getLogger("strands").setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -526,7 +658,7 @@ def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
     """Manage MCP configuration settings.
     
     Args:
-        action: Action to perform - 'status', 'enable', 'disable', 'list_servers', 'server_status'
+        action: Action to perform - 'status', 'enable', 'disable', 'list_servers', 'server_status', 'aws_status'
         server_name: Name of specific MCP server (for server_status action)
         
     Returns:
@@ -538,6 +670,8 @@ def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
         config_exists = os.path.exists(config_path)
         
         result = f"🔧 **MCP Configuration Status:**\n\n"
+        result += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'}\n"
+        result += f"• AWS MCP Integration: {'🟢 Active' if aws_mcp_manager else '🔴 Inactive'}\n"
         result += f"• Configuration Loading: {status}\n"
         result += f"• Config File Path: {config_path}\n"
         result += f"• Config File Exists: {'✅ Yes' if config_exists else '❌ No'}\n"
@@ -547,6 +681,32 @@ def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
             enabled_count = sum(1 for s in servers.values() if not s.get('disabled', False))
             result += f"• Total MCP Servers: {len(servers)}\n"
             result += f"• Enabled Servers: {enabled_count}\n"
+        
+        if aws_mcp_manager:
+            aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
+            result += f"• AWS MCP Tools Available: {aws_tools_count}\n"
+        
+        return result
+    
+    elif action == "aws_status":
+        if not aws_mcp_manager:
+            return "❌ AWS MCP integration is not active"
+        
+        aws_tools = aws_mcp_manager.get_all_aws_tools()
+        active_clients = len(aws_mcp_manager.mcp_clients)
+        
+        result = f"🔧 **AWS MCP Integration Status:**\n\n"
+        result += f"• Status: 🟢 Active\n"
+        result += f"• Active Clients: {active_clients}\n"
+        result += f"• Available Tools: {len(aws_tools)}\n"
+        result += f"• Config Path: {AgentConfig.AWS_MCP_CONFIG_PATH}\n\n"
+        
+        if active_clients > 0:
+            result += "**Active Servers:**\n"
+            for server_name in aws_mcp_manager.mcp_clients.keys():
+                clean_name = server_name.replace('awslabs.', '').replace('-mcp-server', '')
+                server_tools = [t for t in aws_tools if getattr(t, '_server_name', '') == server_name]
+                result += f"• {clean_name}: {len(server_tools)} tools\n"
         
         return result
     
@@ -608,25 +768,25 @@ def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
         return result
     
     else:
-        return f"❌ Unknown action: {action}. Available actions: status, enable, disable, list_servers, server_status"
+        return f"❌ Unknown action: {action}. Available actions: status, enable, disable, list_servers, server_status, aws_status"
 
 @tool
 def list_mcp_tools() -> str:
-    """List all available MCP tools and their descriptions.
+    """List all available AgentCore Gateway MCP tools and their descriptions.
     
     Returns:
-        Formatted list of MCP tools with descriptions
+        Formatted list of AgentCore Gateway MCP tools with descriptions
     """
     if not mcp_client:
-        return "❌ MCP client is not available. No MCP tools are currently accessible."
+        return "❌ AgentCore Gateway MCP client is not available. No gateway MCP tools are currently accessible."
     
     try:
         mcp_tools = get_full_tools_list(mcp_client)
         
         if not mcp_tools:
-            return "ℹ️  No MCP tools are currently available through the gateway."
+            return "ℹ️  No AgentCore Gateway MCP tools are currently available."
         
-        result = f"🔧 **Available MCP Tools ({len(mcp_tools)} total):**\n\n"
+        result = f"🔧 **Available AgentCore Gateway MCP Tools ({len(mcp_tools)} total):**\n\n"
         
         for i, tool in enumerate(mcp_tools, 1):
             tool_name = getattr(tool, 'name', 'Unknown')
@@ -643,11 +803,60 @@ def list_mcp_tools() -> str:
             result += f"{i}. **{tool_name}**{parameters}\n"
             result += f"   {tool_description}\n\n"
         
-        result += "💡 These tools are available through the MCP gateway integration and can be used for advanced functionality."
+        result += "💡 These tools are available through the AgentCore Gateway integration."
         return result
         
     except Exception as e:
-        return f"❌ Error retrieving MCP tools: {str(e)}"
+        return f"❌ Error retrieving AgentCore Gateway MCP tools: {str(e)}"
+
+@tool
+def list_aws_mcp_tools() -> str:
+    """List all available AWS MCP tools and their descriptions.
+    
+    Returns:
+        Formatted list of AWS MCP tools with descriptions
+    """
+    if not aws_mcp_manager:
+        return "❌ AWS MCP manager is not available. No AWS MCP tools are currently accessible."
+    
+    try:
+        aws_tools = aws_mcp_manager.get_all_aws_tools()
+        
+        if not aws_tools:
+            return "ℹ️  No AWS MCP tools are currently available."
+        
+        result = f"🔧 **Available AWS MCP Tools ({len(aws_tools)} total):**\n\n"
+        
+        # Group tools by server
+        tools_by_server = {}
+        for tool in aws_tools:
+            server_name = getattr(tool, '_server_name', 'Unknown')
+            if server_name not in tools_by_server:
+                tools_by_server[server_name] = []
+            tools_by_server[server_name].append(tool)
+        
+        for server_name, tools in tools_by_server.items():
+            clean_server_name = server_name.replace('awslabs.', '').replace('-mcp-server', '')
+            result += f"**{clean_server_name.upper()} ({len(tools)} tools):**\n"
+            
+            for i, tool in enumerate(tools, 1):
+                tool_name = getattr(tool, 'name', 'Unknown')
+                tool_description = getattr(tool, 'description', 'No description available')
+                
+                # Truncate long descriptions
+                if len(tool_description) > 100:
+                    tool_description = tool_description[:97] + "..."
+                
+                result += f"{i:2d}. {tool_name}\n"
+                result += f"    {tool_description}\n"
+            
+            result += "\n"
+        
+        result += "💡 These tools are available through AWS MCP integration and provide direct access to AWS services."
+        return result
+        
+    except Exception as e:
+        return f"❌ Error retrieving AWS MCP tools: {str(e)}"
 
 @tool
 def list_mcp_servers_from_config() -> str:
@@ -1169,16 +1378,25 @@ def get_full_tools_list(client):
 
 def create_tools_list():
     """Create the list of tools for the agent."""
-    tools_list = [websearch, list_mcp_tools]
+    tools_list = [websearch, list_mcp_tools, list_aws_mcp_tools]
     
-    # Add MCP tools if available
+    # Add AgentCore Gateway MCP tools if available
     if mcp_client:
         try:
             mcp_tools = get_full_tools_list(mcp_client)
             tools_list.extend(mcp_tools)
-            print(f"✅ Added {len(mcp_tools)} MCP tools (with pagination support)")
+            print(f"✅ Added {len(mcp_tools)} AgentCore Gateway MCP tools")
         except Exception as e:
-            print(f"⚠️  Could not get MCP tools: {e}")
+            print(f"⚠️  Could not get AgentCore Gateway MCP tools: {e}")
+    
+    # Add AWS MCP tools if available
+    if aws_mcp_manager:
+        try:
+            aws_tools = aws_mcp_manager.get_all_aws_tools()
+            tools_list.extend(aws_tools)
+            print(f"✅ Added {len(aws_tools)} AWS MCP tools")
+        except Exception as e:
+            print(f"⚠️  Could not get AWS MCP tools: {e}")
     
     return tools_list
 
@@ -1260,12 +1478,16 @@ class ConversationManager:
         help_text += "• `manage_mcp_config()` - Manage MCP configuration\n"
         help_text += "• `show_available_mcp_servers()` - Show servers with details\n\n"
         
+        help_text += "**MCP Tools:**\n"
+        help_text += "• `list_mcp_tools()` - List AgentCore Gateway MCP tools\n"
+        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (AWS services)\n\n"
+        
         help_text += "**Other Tools:**\n"
-        help_text += "• `websearch()` - Search the web for information\n"
-        help_text += "• `list_mcp_tools()` - List available MCP tools\n\n"
+        help_text += "• `websearch()` - Search the web for information\n\n"
         
         help_text += "💡 **Tips:**\n"
-        help_text += f"• MCP Configuration: {'🟢 Enabled' if AgentConfig.ENABLE_MCP_CONFIG else '🔴 Disabled'}\n"
+        help_text += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'}\n"
+        help_text += f"• AWS MCP Integration: {'🟢 Enabled' if aws_mcp_manager else '🔴 Disabled'}\n"
         help_text += f"• Available MCP Servers: {len(AgentConfig.get_mcp_servers())}\n"
         help_text += "• Ask me anything about Prometheus, monitoring, or AWS!"
         
@@ -1376,9 +1598,15 @@ def main():
         setup_gateway_parameters()
         return
     
-    agent = create_devops_agent()
-    conversation_manager = ConversationManager(agent)
-    conversation_manager.start_conversation()
+    try:
+        agent = create_devops_agent()
+        conversation_manager = ConversationManager(agent)
+        conversation_manager.start_conversation()
+    finally:
+        # Cleanup AWS MCP clients
+        if aws_mcp_manager:
+            print("🔄 Cleaning up AWS MCP clients...")
+            aws_mcp_manager.cleanup()
 
 if __name__ == "__main__":
     main()

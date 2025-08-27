@@ -53,6 +53,10 @@ class AgentConfig:
     # AWS Settings
     DEFAULT_REGION = 'us-east-1'
     
+    # MCP Configuration
+    ENABLE_MCP_CONFIG = True  # Toggle to enable/disable MCP config loading
+    MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'
+    
     # Available Models
     AVAILABLE_MODELS = {
         'claude-sonnet-4': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
@@ -107,6 +111,55 @@ class AgentConfig:
         """Setup AWS region configuration."""
         os.environ['AWS_DEFAULT_REGION'] = cls.DEFAULT_REGION
         return Session().region_name
+    
+    @classmethod
+    def load_mcp_config(cls):
+        """Load MCP configuration from the specified file path."""
+        if not cls.ENABLE_MCP_CONFIG:
+            return None
+            
+        try:
+            if not os.path.exists(cls.MCP_CONFIG_PATH):
+                print(f"⚠️  MCP config file not found")
+                return None
+                
+            with open(cls.MCP_CONFIG_PATH, 'r') as f:
+                mcp_config = json.load(f)
+                return mcp_config
+                
+        except json.JSONDecodeError as e:
+            print(f"❌ Invalid JSON in MCP config file: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ Error loading MCP config: {e}")
+            return None
+    
+    @classmethod
+    def get_mcp_servers(cls):
+        """Get MCP servers configuration."""
+        mcp_config = cls.load_mcp_config()
+        if mcp_config and 'mcpServers' in mcp_config:
+            return mcp_config['mcpServers']
+        return {}
+    
+    @classmethod
+    def is_mcp_server_enabled(cls, server_name: str):
+        """Check if a specific MCP server is enabled."""
+        servers = cls.get_mcp_servers()
+        if server_name in servers:
+            return not servers[server_name].get('disabled', False)
+        return False
+    
+    @classmethod
+    def toggle_mcp_config(cls, enabled: bool = None):
+        """Toggle MCP configuration loading on/off."""
+        if enabled is None:
+            cls.ENABLE_MCP_CONFIG = not cls.ENABLE_MCP_CONFIG
+        else:
+            cls.ENABLE_MCP_CONFIG = enabled
+        
+        status = "enabled" if cls.ENABLE_MCP_CONFIG else "disabled"
+        return cls.ENABLE_MCP_CONFIG
 
 def select_model_interactive():
     """Interactive model selection for CLI usage."""
@@ -154,11 +207,27 @@ if len(sys.argv) > 1:
         for key, desc in AgentConfig.list_models().items():
             current = " (CURRENT)" if key == AgentConfig.SELECTED_MODEL else ""
             print(f"  • {desc}{current}")
+        print("\nMCP Configuration Tools:")
+        print("  • list_mcp_server_names()       # Quick list of server names")
+        print("  • list_mcp_servers_from_config() # Detailed server information")
+        print("  • manage_mcp_config()           # Manage MCP configuration")
+        print("  • show_available_mcp_servers()  # Show servers with details")
         print()
         sys.exit(0)
 
 # Initialize configuration
 REGION = AgentConfig.setup_aws_region()
+
+# Initialize MCP configuration
+print(f"🔧 MCP Configuration: {'enabled' if AgentConfig.ENABLE_MCP_CONFIG else 'disabled'}")
+
+if AgentConfig.ENABLE_MCP_CONFIG:
+    mcp_servers = AgentConfig.get_mcp_servers()
+    if mcp_servers:
+        enabled_servers = [name for name, config in mcp_servers.items() if not config.get('disabled', False)]
+        print(f"   • {len(enabled_servers)} MCP servers available")
+    else:
+        print(f"   • No MCP servers found")
 
 def validate_discovery_url(url):
     """Validate that the discovery URL is accessible and returns valid OIDC configuration."""
@@ -415,6 +484,133 @@ logger = logging.getLogger(__name__)
 
 # Define a websearch tool
 @tool
+def list_mcp_server_names() -> str:
+    """Get a quick list of all MCP server names from the configuration file.
+    
+    Returns:
+        Simple list of MCP server names with their status
+    """
+    if not AgentConfig.ENABLE_MCP_CONFIG:
+        return "❌ MCP configuration loading is disabled."
+    
+    servers = AgentConfig.get_mcp_servers()
+    if not servers:
+        return "ℹ️  No MCP servers found in configuration file."
+    
+    enabled_servers = []
+    disabled_servers = []
+    
+    for name, config in servers.items():
+        if config.get('disabled', False):
+            disabled_servers.append(name)
+        else:
+            enabled_servers.append(name)
+    
+    result = f"📋 **MCP Server Names ({len(servers)} total):**\n\n"
+    
+    if enabled_servers:
+        result += f"🟢 **Enabled ({len(enabled_servers)}):**\n"
+        for i, name in enumerate(enabled_servers, 1):
+            result += f"{i:2d}. {name}\n"
+        result += "\n"
+    
+    if disabled_servers:
+        result += f"🔴 **Disabled ({len(disabled_servers)}):**\n"
+        for i, name in enumerate(disabled_servers, 1):
+            result += f"{i:2d}. {name}\n"
+    
+    return result
+
+@tool
+def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
+    """Manage MCP configuration settings.
+    
+    Args:
+        action: Action to perform - 'status', 'enable', 'disable', 'list_servers', 'server_status'
+        server_name: Name of specific MCP server (for server_status action)
+        
+    Returns:
+        Status information or configuration details
+    """
+    if action == "status":
+        status = "enabled" if AgentConfig.ENABLE_MCP_CONFIG else "disabled"
+        config_path = AgentConfig.MCP_CONFIG_PATH
+        config_exists = os.path.exists(config_path)
+        
+        result = f"🔧 **MCP Configuration Status:**\n\n"
+        result += f"• Configuration Loading: {status}\n"
+        result += f"• Config File Path: {config_path}\n"
+        result += f"• Config File Exists: {'✅ Yes' if config_exists else '❌ No'}\n"
+        
+        if config_exists and AgentConfig.ENABLE_MCP_CONFIG:
+            servers = AgentConfig.get_mcp_servers()
+            enabled_count = sum(1 for s in servers.values() if not s.get('disabled', False))
+            result += f"• Total MCP Servers: {len(servers)}\n"
+            result += f"• Enabled Servers: {enabled_count}\n"
+        
+        return result
+    
+    elif action == "enable":
+        AgentConfig.toggle_mcp_config(True)
+        return "✅ MCP configuration loading enabled"
+    
+    elif action == "disable":
+        AgentConfig.toggle_mcp_config(False)
+        return "❌ MCP configuration loading disabled"
+    
+    elif action == "list_servers":
+        if not AgentConfig.ENABLE_MCP_CONFIG:
+            return "❌ MCP configuration loading is disabled. Enable it first with action='enable'"
+        
+        servers = AgentConfig.get_mcp_servers()
+        if not servers:
+            return "ℹ️  No MCP servers found in configuration"
+        
+        result = f"🔧 **MCP Servers ({len(servers)} total):**\n\n"
+        for name, config in servers.items():
+            status = "🟢 Enabled" if not config.get('disabled', False) else "🔴 Disabled"
+            command = config.get('command', 'Unknown')
+            args = config.get('args', [])
+            result += f"• **{name}**: {status}\n"
+            result += f"  Command: {command} {' '.join(args)}\n\n"
+        
+        return result
+    
+    elif action == "server_status":
+        if not server_name:
+            return "❌ server_name parameter required for server_status action"
+        
+        if not AgentConfig.ENABLE_MCP_CONFIG:
+            return "❌ MCP configuration loading is disabled"
+        
+        servers = AgentConfig.get_mcp_servers()
+        if server_name not in servers:
+            return f"❌ Server '{server_name}' not found in configuration"
+        
+        server_config = servers[server_name]
+        enabled = not server_config.get('disabled', False)
+        
+        result = f"🔧 **MCP Server: {server_name}**\n\n"
+        result += f"• Status: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
+        result += f"• Command: {server_config.get('command', 'Unknown')}\n"
+        result += f"• Args: {' '.join(server_config.get('args', []))}\n"
+        
+        env_vars = server_config.get('env', {})
+        if env_vars:
+            result += f"• Environment Variables:\n"
+            for key, value in env_vars.items():
+                result += f"  - {key}: {value}\n"
+        
+        auto_approve = server_config.get('autoApprove', [])
+        if auto_approve:
+            result += f"• Auto-approved Tools: {', '.join(auto_approve)}\n"
+        
+        return result
+    
+    else:
+        return f"❌ Unknown action: {action}. Available actions: status, enable, disable, list_servers, server_status"
+
+@tool
 def list_mcp_tools() -> str:
     """List all available MCP tools and their descriptions.
     
@@ -452,6 +648,137 @@ def list_mcp_tools() -> str:
         
     except Exception as e:
         return f"❌ Error retrieving MCP tools: {str(e)}"
+
+@tool
+def list_mcp_servers_from_config() -> str:
+    """List all MCP servers loaded from the configuration file with their details.
+    
+    Returns:
+        Comprehensive list of all MCP servers from the config file
+    """
+    if not AgentConfig.ENABLE_MCP_CONFIG:
+        return "❌ MCP configuration loading is disabled. Use manage_mcp_config(action='enable') to enable it."
+    
+    servers = AgentConfig.get_mcp_servers()
+    if not servers:
+        return "ℹ️  No MCP servers found in configuration file."
+    
+    result = f"📋 **All MCP Servers from Configuration ({len(servers)} total):**\n\n"
+    
+    enabled_count = 0
+    disabled_count = 0
+    
+    for name, config in servers.items():
+        is_enabled = not config.get('disabled', False)
+        status_icon = "🟢" if is_enabled else "🔴"
+        status_text = "Enabled" if is_enabled else "Disabled"
+        
+        if is_enabled:
+            enabled_count += 1
+        else:
+            disabled_count += 1
+        
+        result += f"{status_icon} **{name}** ({status_text})\n"
+        result += f"   Command: `{config.get('command', 'Unknown')}`\n"
+        
+        args = config.get('args', [])
+        if args:
+            args_str = ' '.join(args)
+            # Truncate very long args for readability
+            if len(args_str) > 80:
+                args_str = args_str[:77] + "..."
+            result += f"   Args: {args_str}\n"
+        
+        env_vars = config.get('env', {})
+        if env_vars:
+            env_list = [f"{k}={v}" for k, v in env_vars.items()]
+            env_str = ', '.join(env_list)
+            if len(env_str) > 60:
+                env_str = env_str[:57] + "..."
+            result += f"   Environment: {env_str}\n"
+        
+        auto_approve = config.get('autoApprove', [])
+        if auto_approve:
+            auto_str = ', '.join(auto_approve[:3])
+            if len(auto_approve) > 3:
+                auto_str += f" (+{len(auto_approve)-3} more)"
+            result += f"   Auto-approved: {auto_str}\n"
+        
+        result += "\n"
+    
+    # Summary
+    result += f"📊 **Summary:**\n"
+    result += f"• Total Servers: {len(servers)}\n"
+    result += f"• Enabled: {enabled_count}\n"
+    result += f"• Disabled: {disabled_count}\n"
+    
+    return result
+
+@tool
+def show_available_mcp_servers() -> str:
+    """Show all MCP servers available from the loaded configuration file.
+    
+    Returns:
+        Detailed list of MCP servers from the configuration file
+    """
+    if not AgentConfig.ENABLE_MCP_CONFIG:
+        return "❌ MCP configuration loading is disabled. Use manage_mcp_config(action='enable') to enable it."
+    
+    servers = AgentConfig.get_mcp_servers()
+    if not servers:
+        return "ℹ️  No MCP servers found in configuration file."
+    
+    result = f"🔧 **MCP Servers from Configuration File ({len(servers)} total):**\n\n"
+    result += f"📁 **Config Path:** {AgentConfig.MCP_CONFIG_PATH}\n\n"
+    
+    enabled_servers = []
+    disabled_servers = []
+    
+    for name, config in servers.items():
+        server_info = {
+            'name': name,
+            'command': config.get('command', 'Unknown'),
+            'args': config.get('args', []),
+            'env': config.get('env', {}),
+            'disabled': config.get('disabled', False),
+            'autoApprove': config.get('autoApprove', [])
+        }
+        
+        if server_info['disabled']:
+            disabled_servers.append(server_info)
+        else:
+            enabled_servers.append(server_info)
+    
+    # Show enabled servers first
+    if enabled_servers:
+        result += f"🟢 **Enabled Servers ({len(enabled_servers)}):**\n\n"
+        for server in enabled_servers:
+            result += f"• **{server['name']}**\n"
+            result += f"  Command: `{server['command']} {' '.join(server['args'])}`\n"
+            
+            if server['env']:
+                env_summary = ', '.join([f"{k}={v}" for k, v in list(server['env'].items())[:2]])
+                if len(server['env']) > 2:
+                    env_summary += f" (+{len(server['env'])-2} more)"
+                result += f"  Environment: {env_summary}\n"
+            
+            if server['autoApprove']:
+                auto_approve_summary = ', '.join(server['autoApprove'][:3])
+                if len(server['autoApprove']) > 3:
+                    auto_approve_summary += f" (+{len(server['autoApprove'])-3} more)"
+                result += f"  Auto-approved: {auto_approve_summary}\n"
+            
+            result += "\n"
+    
+    # Show disabled servers
+    if disabled_servers:
+        result += f"🔴 **Disabled Servers ({len(disabled_servers)}):**\n\n"
+        for server in disabled_servers:
+            result += f"• **{server['name']}** (disabled)\n"
+            result += f"  Command: `{server['command']} {' '.join(server['args'])}`\n\n"
+    
+    result += f"💡 Use `manage_mcp_config(action='server_status', server_name='<name>')` for detailed server info."
+    return result
 
 @tool
 def websearch(
@@ -831,13 +1158,13 @@ def get_full_tools_list(client):
         return tools
         
     except Exception as e:
-        print(f"⚠️  Error in get_full_tools_list: {e}")
+        # print(f"⚠️  MCP tools fetch failed")
         # Fallback to simple list_tools_sync
         try:
             simple_tools = client.list_tools_sync()
             return simple_tools if hasattr(simple_tools, '__iter__') else [simple_tools] if simple_tools else []
         except Exception as fallback_error:
-            print(f"⚠️  Fallback also failed: {fallback_error}")
+            # print(f"⚠️  MCP tools unavailable")
             return []
 
 def create_tools_list():
@@ -887,9 +1214,67 @@ class ConversationManager:
         self.bot_name = bot_name
         self.exit_commands = {'exit', 'quit', 'bye'}
     
+    def _list_all_mcp_tools(self) -> str:
+        """List all MCP tools loaded from the configuration file."""
+        if not AgentConfig.ENABLE_MCP_CONFIG:
+            return "❌ MCP configuration disabled"
+        
+        servers = AgentConfig.get_mcp_servers()
+        if not servers:
+            return "ℹ️  No MCP servers found"
+        
+        enabled_servers = []
+        disabled_servers = []
+        
+        for name, config in servers.items():
+            # Extract clean server name
+            clean_name = name.replace('awslabs.', '').replace('-mcp-server', '').replace('-mcp', '')
+            
+            if config.get('disabled', False):
+                disabled_servers.append(clean_name)
+            else:
+                enabled_servers.append(clean_name)
+        
+        result = f"🔧 **MCP Tools ({len(enabled_servers)} enabled):**\n"
+        
+        # Show enabled servers in a compact list
+        for i, name in enumerate(enabled_servers, 1):
+            result += f"{i:2d}. {name}\n"
+        
+        if disabled_servers:
+            result += f"\n🔴 **Disabled ({len(disabled_servers)}):** {', '.join(disabled_servers)}"
+        
+        return result
+    
+    def _show_help(self) -> str:
+        """Show available commands and help information."""
+        help_text = "🔧 **Available Commands:**\n\n"
+        help_text += "**Special Commands:**\n"
+        help_text += "• `/tool` or `/tools` - List all MCP tools from configuration\n"
+        help_text += "• `/help` or `/h` - Show this help message\n"
+        help_text += "• `exit`, `quit`, `bye` - Exit the agent\n\n"
+        
+        help_text += "**MCP Management Tools:**\n"
+        help_text += "• `list_mcp_server_names()` - Quick list of server names\n"
+        help_text += "• `list_mcp_servers_from_config()` - Detailed server info\n"
+        help_text += "• `manage_mcp_config()` - Manage MCP configuration\n"
+        help_text += "• `show_available_mcp_servers()` - Show servers with details\n\n"
+        
+        help_text += "**Other Tools:**\n"
+        help_text += "• `websearch()` - Search the web for information\n"
+        help_text += "• `list_mcp_tools()` - List available MCP tools\n\n"
+        
+        help_text += "💡 **Tips:**\n"
+        help_text += f"• MCP Configuration: {'🟢 Enabled' if AgentConfig.ENABLE_MCP_CONFIG else '🔴 Disabled'}\n"
+        help_text += f"• Available MCP Servers: {len(AgentConfig.get_mcp_servers())}\n"
+        help_text += "• Ask me anything about Prometheus, monitoring, or AWS!"
+        
+        return help_text
+    
     def start_conversation(self):
         """Start the interactive conversation loop."""
-        print(f"\n🚀 {self.bot_name}: Ask me about EKS on AWS! Type 'exit' to quit.\n")
+        print(f"\n🚀 {self.bot_name}: Ask me about Prometheus and AWS! Type 'exit' to quit.")
+        print(f"💡 Special commands: /tool or /tools (list MCP tools), /help (show commands)\n")
         
         try:
             while True:
@@ -902,6 +1287,16 @@ class ConversationManager:
                         
                     if not user_input:
                         print(f"\n{self.bot_name} > Please ask me something about EKS on AWS!")
+                        continue
+                    
+                    # Handle special commands
+                    if user_input.lower() in ["/tool", "/tools"]:
+                        tool_list = self._list_all_mcp_tools()
+                        print(f"\n{self.bot_name} > {tool_list}")
+                        continue
+                    elif user_input.lower() in ["/help", "/h"]:
+                        help_text = self._show_help()
+                        print(f"\n{self.bot_name} > {help_text}")
                         continue
                     
                     response = self.agent(user_input)

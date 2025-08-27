@@ -773,10 +773,10 @@ class PrometheusAgentMemoryHooks(HookProvider):
             logger.error(f"Failed to save DevOps interaction: {e}")
 
     def register_hooks(self, registry: HookRegistry) -> None:
-        """Register EKS Agent memory hooks"""
-        registry.add_callback(MessageAddedEvent, self.retrieve_devops_context)
-        registry.add_callback(AfterInvocationEvent, self.save_devops_interaction)
-        logger.info("EKS Agent memory hooks registered")
+        """Register Prometheus Agent memory hooks"""
+        registry.add_callback(MessageAddedEvent, self.retrieve_prometheus_context)
+        registry.add_callback(AfterInvocationEvent, self.save_prometheus_interaction)
+        logger.info("Prometheus Agent memory hooks registered")
 
 SESSION_ID = str(uuid.uuid4())
 
@@ -787,7 +787,7 @@ def create_agent_hooks(memory_id: str | None) -> list:
         return []
     
     session_id = str(uuid.uuid4())
-    memory_hooks = DevOpsAgentMemoryHooks(
+    memory_hooks = PrometheusAgentMemoryHooks(
         memory_id, memory_client, AgentConfig.DEVOPS_USER_ID, session_id
     )
     logger.info("Memory hooks enabled")

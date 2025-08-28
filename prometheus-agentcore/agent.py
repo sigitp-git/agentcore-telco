@@ -48,7 +48,7 @@ from bedrock_agentcore.memory.constants import StrategyType
 # Import AgentCore Identity
 from bedrock_agentcore.identity.auth import requires_access_token
 
-sts_client = boto3.client('sts')
+# STS client will be initialized after region setup
 
 class AWSMCPManager:
     """Manages AWS MCP tools integration."""
@@ -104,6 +104,13 @@ class AWSMCPManager:
         try:
             # Create environment with current env + server env
             full_env = os.environ.copy()
+            
+            # Ensure AWS region is set for all AWS MCP servers
+            if 'aws' in server_name.lower() or any('aws' in arg.lower() for arg in args):
+                full_env.setdefault('AWS_DEFAULT_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+                full_env.setdefault('AWS_REGION', os.environ.get('AWS_REGION', 'us-east-1'))
+            
+            # Apply server-specific environment variables
             full_env.update(env)
             
             # Create MCP client using stdio
@@ -234,8 +241,23 @@ class AgentConfig:
     @classmethod
     def setup_aws_region(cls):
         """Setup AWS region configuration."""
+        # Set environment variables for AWS region
         os.environ['AWS_DEFAULT_REGION'] = cls.DEFAULT_REGION
-        return Session().region_name
+        os.environ['AWS_REGION'] = cls.DEFAULT_REGION
+        
+        # Create a new session to ensure region is properly set
+        session = Session()
+        actual_region = session.region_name or cls.DEFAULT_REGION
+        
+        # Verify the region is set correctly
+        if actual_region != cls.DEFAULT_REGION:
+            print(f"⚠️  Region mismatch: expected {cls.DEFAULT_REGION}, got {actual_region}")
+            # Force the region in the session
+            session = Session(region_name=cls.DEFAULT_REGION)
+            actual_region = cls.DEFAULT_REGION
+        
+        print(f"🌍 AWS region configured: {actual_region}")
+        return actual_region
     
     @classmethod
     def load_mcp_config(cls):
@@ -342,6 +364,9 @@ if len(sys.argv) > 1:
 
 # Initialize configuration
 REGION = AgentConfig.setup_aws_region()
+
+# Initialize AWS clients with proper region
+sts_client = boto3.client('sts', region_name=REGION)
 
 # Initialize MCP configuration
 print(f"🔧 MCP Configuration: {'enabled' if AgentConfig.ENABLE_MCP_CONFIG else 'disabled'}")
@@ -607,6 +632,22 @@ aws_mcp_manager = None
 if AgentConfig.ENABLE_AWS_MCP:
     try:
         print("🔧 Initializing AWS MCP integration...")
+        
+        # Verify AWS region is properly configured before MCP initialization
+        current_region = os.environ.get('AWS_DEFAULT_REGION', 'not-set')
+        print(f"   • AWS region: {current_region}")
+        
+        # Verify AWS credentials are available
+        try:
+            session = Session()
+            credentials = session.get_credentials()
+            if credentials is None:
+                raise Exception("No AWS credentials found")
+            print(f"   • AWS credentials: ✅ Available")
+        except Exception as cred_error:
+            print(f"   • AWS credentials: ❌ {cred_error}")
+            raise Exception(f"AWS credentials not available: {cred_error}")
+        
         aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
         aws_mcp_manager.initialize_aws_mcp_clients()
         aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
@@ -999,6 +1040,131 @@ def show_available_mcp_servers() -> str:
     return result
 
 @tool
+def list_eks_clusters() -> str:
+    """List all EKS clusters in the current AWS account and region.
+    
+    Returns:
+        str: A formatted list of EKS clusters with their status and versions
+    """
+    try:
+        import boto3
+        
+        # Use the configured region
+        eks_client = boto3.client('eks', region_name=REGION)
+        
+        # List clusters
+        response = eks_client.list_clusters()
+        clusters = response.get('clusters', [])
+        
+        if not clusters:
+            return "No EKS clusters found in the current region."
+        
+        result = f"Found {len(clusters)} EKS clusters in region {REGION}:\n\n"
+        
+        # Get details for each cluster
+        for cluster_name in clusters:
+            try:
+                cluster_info = eks_client.describe_cluster(name=cluster_name)
+                cluster = cluster_info['cluster']
+                
+                status = cluster.get('status', 'Unknown')
+                version = cluster.get('version', 'Unknown')
+                created = cluster.get('createdAt', 'Unknown')
+                endpoint = cluster.get('endpoint', 'N/A')
+                
+                result += f"• {cluster_name}\n"
+                result += f"  Status: {status}\n"
+                result += f"  Version: {version}\n"
+                result += f"  Created: {created}\n"
+                result += f"  Endpoint: {endpoint}\n\n"
+                
+            except Exception as e:
+                result += f"• {cluster_name}\n"
+                result += f"  Error getting details: {str(e)}\n\n"
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error listing EKS clusters: {e}")
+        return f"Error listing EKS clusters: {str(e)}"
+
+@tool
+def aws_resource_guidance() -> str:
+    """Get guidance on which tools to use for different AWS resource operations.
+    
+    This tool provides guidance on choosing the correct MCP tools for AWS operations.
+    Use this when you need to understand which tool to use for specific AWS tasks.
+    
+    Returns:
+        str: Detailed guidance on AWS tool usage
+    """
+    guidance = """🔧 **AWS Resource Tool Usage Guide**
+
+**For EKS Cluster Operations:**
+
+1. **List EKS Clusters** (AWS Account Level):
+   ✅ USE: `list_eks_clusters()` - Lists all EKS clusters in your account
+   ✅ USE: `list_resources` (CCAPI) with resource_type="AWS::EKS::Cluster"
+   ❌ DON'T USE: `list_k8s_resources` (EKS MCP) - This is for resources WITHIN clusters
+
+2. **Manage Kubernetes Resources** (Within a Cluster):
+   ✅ USE: `list_k8s_resources` (EKS MCP) - Lists pods, services, etc. within a specific cluster
+   ✅ USE: `get_k8s_events` (EKS MCP) - Gets events for specific resources
+   ✅ USE: `get_pod_logs` (EKS MCP) - Gets logs from pods
+
+**For Other AWS Resources:**
+
+3. **List AWS Resources** (Account Level):
+   ✅ USE: `list_resources` (CCAPI) - Lists any AWS resource type (S3, RDS, etc.)
+   ✅ USE: `get_resource` (CCAPI) - Gets details of specific resources
+
+4. **CloudWatch Operations:**
+   ✅ USE: CloudWatch MCP tools for metrics, logs, and alarms
+
+**Key Rule:**
+- EKS MCP tools work WITHIN clusters (need cluster_name parameter)
+- CCAPI/Core MCP tools work at AWS account level (list clusters, buckets, etc.)
+"""
+    return guidance
+
+@tool
+def eks_tool_guidance() -> str:
+    """Get specific guidance for EKS-related operations and tool selection.
+    
+    Use this tool when you need to understand which EKS tools to use for specific tasks.
+    
+    Returns:
+        str: Detailed EKS tool usage guidance
+    """
+    guidance = """🚀 **EKS Tool Selection Guide**
+
+**IMPORTANT: Choose the RIGHT tool for your EKS task!**
+
+**❓ User asks: "List all my EKS clusters"**
+✅ CORRECT: Use `list_eks_clusters()` or `list_resources` with resource_type="AWS::EKS::Cluster"
+❌ WRONG: Don't use `list_k8s_resources` - this needs a cluster name!
+
+**❓ User asks: "List pods in my cluster"**
+✅ CORRECT: Use `list_k8s_resources` with cluster_name="your-cluster" and kind="Pod"
+❌ WRONG: Don't use `list_eks_clusters()` - this only lists clusters, not pods
+
+**❓ User asks: "Show me cluster details"**
+✅ CORRECT: Use `get_resource` with resource_type="AWS::EKS::Cluster" and identifier="cluster-name"
+✅ ALSO CORRECT: Use `list_eks_clusters()` for basic info
+
+**❓ User asks: "Get pod logs"**
+✅ CORRECT: Use `get_pod_logs` with cluster_name, namespace, and pod_name
+
+**Tool Categories:**
+1. **Cluster Management** (AWS Level): list_eks_clusters, get_resource, create_resource
+2. **Kubernetes Resources** (Within Cluster): list_k8s_resources, get_k8s_events, get_pod_logs
+3. **Monitoring** (CloudWatch): get_cloudwatch_logs, get_cloudwatch_metrics
+
+**Remember:** EKS clusters are AWS resources. Pods/Services are Kubernetes resources within clusters.
+"""
+    return guidance
+
+@tool
 def websearch(
     keywords: str, region: str = AgentConfig.SEARCH_REGION, max_results: int | None = None
 ) -> str:
@@ -1146,7 +1312,7 @@ class MemoryManager:
             logger.info("Creating AgentCore Memory resources. This can take a couple of minutes...")
             response = self.client.create_memory_and_wait(
                 name=self.memory_name,
-                description="EKS Agent memory",
+                description="Prometheus Agent memory",
                 strategies=strategies,
                 event_expiry_days=AgentConfig.MEMORY_EXPIRY_DAYS,
             )
@@ -1387,7 +1553,18 @@ def get_full_tools_list(client):
 
 def create_tools_list():
     """Create the list of tools for the agent."""
-    tools_list = [websearch, list_mcp_tools, list_aws_mcp_tools]
+    tools_list = [
+        websearch, 
+        list_mcp_tools, 
+        list_aws_mcp_tools,
+        list_mcp_server_names,
+        manage_mcp_config,
+        list_mcp_servers_from_config,
+        show_available_mcp_servers,
+        list_eks_clusters,
+        aws_resource_guidance,
+        eks_tool_guidance
+    ]
     
     # Add AgentCore Gateway MCP tools if available
     if mcp_client:
@@ -1410,13 +1587,21 @@ def create_tools_list():
     return tools_list
 
 def create_devops_agent() -> Agent:
-    """Create and configure the EKS agent."""
+    """Create and configure the Prometheus agent."""
     hooks = create_agent_hooks(memory_id)
     
     return Agent(
         model=model,
         hooks=hooks,
-        system_prompt="""You are AWS EKS agent. Help with AWS infrastructure and operations.
+        system_prompt="""You are AWS Prometheus agent. Help with Prometheus monitoring, metrics, and AWS infrastructure operations.
+
+CRITICAL TOOL SELECTION RULES:
+- For "list EKS clusters": Use `list_eks_clusters()` or `list_resources` with resource_type="AWS::EKS::Cluster"
+- For "list pods/services/etc": Use `list_k8s_resources` with cluster_name (requires specific cluster)
+- For AWS account resources: Use CCAPI tools (list_resources, get_resource)
+- For Kubernetes resources within clusters: Use EKS MCP tools (list_k8s_resources, get_pod_logs)
+- NEVER use `list_k8s_resources` without a valid cluster_name parameter
+- If unsure about tool selection, use `aws_resource_guidance()` or `eks_tool_guidance()`
 
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools
@@ -1436,7 +1621,7 @@ NON-FUNCTIONAL RULES:
 class ConversationManager:
     """Manages the interactive conversation loop."""
     
-    def __init__(self, agent: Agent, bot_name: str = "AWS-EKS-agent"):
+    def __init__(self, agent: Agent, bot_name: str = "AWS-Prometheus-agent"):
         self.agent = agent
         self.bot_name = bot_name
         self.exit_commands = {'exit', 'quit', 'bye'}
@@ -1517,7 +1702,7 @@ class ConversationManager:
                         break
                         
                     if not user_input:
-                        print(f"\n{self.bot_name} > Please ask me something about EKS on AWS!")
+                        print(f"\n{self.bot_name} > Please ask me something about your Prometheus metrics!")
                         continue
                     
                     # Handle special commands

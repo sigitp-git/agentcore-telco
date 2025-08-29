@@ -4,10 +4,10 @@
 
 ```bash
 # From project root - use the convenience script
-uv run python run_a2a_example.py
+python3 run_a2a_example.py
 
 # Or run directly
-uv run python agent2agent/examples/a2a_integration_example_full.py
+python3 agent2agent/examples/a2a_integration_example_full.py
 ```
 
 ## 📁 Directory Structure
@@ -17,6 +17,7 @@ agent2agent/
 ├── README.md                    # Main documentation
 ├── QUICK_START.md              # This file
 ├── __init__.py                 # Package initialization
+├── types.py                    # A2A type definitions and data models
 ├── docs/                       # Documentation
 │   ├── A2A_INTEGRATION_GUIDE.md      # Complete integration guide
 │   └── A2A_IMPLEMENTATION_SUMMARY.md # Implementation summary
@@ -33,6 +34,11 @@ agent2agent/
 ## 🔧 Usage in Your Code
 
 ```python
+# Import A2A types for protocol communication
+from agent2agent.types import (
+    AgentCard, AgentCapabilities, AgentSkill, Message, TextPart, Role
+)
+
 # Import the EKS A2A wrapper
 from agent2agent.wrappers.eks_a2a_wrapper import EKSA2AWrapper
 

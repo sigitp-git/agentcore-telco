@@ -8,6 +8,7 @@ This directory contains the Agent2Agent protocol integration for AWS Telco Agent
 agent2agent/
 ├── README.md                    # This file
 ├── __init__.py                  # Package initialization
+├── types.py                     # A2A type definitions and data models
 ├── docs/                        # Documentation
 │   ├── A2A_INTEGRATION_GUIDE.md      # Complete integration guide
 │   └── A2A_IMPLEMENTATION_SUMMARY.md # Implementation summary
@@ -28,14 +29,21 @@ agent2agent/
 
 ```bash
 # From project root
-uv run python agent2agent/examples/a2a_integration_example_full.py
+python3 agent2agent/examples/a2a_integration_example_full.py
 # Or use the convenience script
-uv run python run_a2a_example.py
+python3 run_a2a_example.py
 ```
 
-### 2. Use A2A Wrapper in Your Agent
+### 2. Use A2A Types and Wrapper in Your Agent
 
 ```python
+# Import A2A types for protocol communication
+from agent2agent.types import (
+    AgentCard, AgentCapabilities, AgentSkill, AgentProvider,
+    Message, TextPart, Role, A2ARequest, A2AResponse
+)
+
+# Import the EKS A2A wrapper
 from agent2agent.wrappers.eks_a2a_wrapper import EKSA2AWrapper
 
 # In your EKS agent
@@ -70,11 +78,95 @@ metrics = await a2a_wrapper.send_request_to_agent("Prometheus-Agent", {
 
 ## Key Features
 
+- **Complete Type System**: Full A2A protocol type definitions with validation
 - **Agent Discovery**: Automatic discovery of available agents and their capabilities
 - **Cross-Agent Communication**: Seamless request/response between agents
 - **Enhanced Troubleshooting**: Multi-domain context for comprehensive analysis
 - **Collaborative Workflows**: Agents work together on complex infrastructure issues
 - **Comprehensive Recommendations**: Combined insights from multiple agents
+- **Structured Messaging**: Type-safe message passing with role-based communication
+
+## A2A Type System
+
+The `agent2agent.types` module provides comprehensive type definitions for the Agent2Agent protocol:
+
+### Core Types
+
+```python
+from agent2agent.types import (
+    # Message types
+    Message, TextPart, Role,
+    
+    # Agent metadata
+    AgentCard, AgentCapabilities, AgentSkill, AgentProvider,
+    
+    # Request/Response
+    A2ARequest, A2AResponse,
+    
+    # Utility functions
+    create_text_message, create_agent_skill, create_basic_capabilities
+)
+```
+
+### Agent Card Example
+
+```python
+from agent2agent.types import AgentCard, AgentCapabilities, AgentSkill, AgentProvider
+
+# Create agent capabilities
+capabilities = AgentCapabilities(
+    streaming=True,
+    push_notifications=False,
+    state_transition_history=True
+)
+
+# Define agent skills
+skills = [
+    AgentSkill(
+        id="eks-cluster-management",
+        name="cluster_management",
+        description="Create, update, delete, and troubleshoot EKS clusters",
+        tags=["kubernetes", "eks", "cluster"]
+    )
+]
+
+# Create agent card
+agent_card = AgentCard(
+    name="EKS-Agent",
+    version="1.0.0",
+    description="AWS EKS management and troubleshooting agent",
+    url="https://eks-agent.internal:8001",
+    capabilities=capabilities,
+    skills=skills,
+    provider=AgentProvider(organization="AWS Telco Team"),
+    default_input_modes=["text", "json"],
+    default_output_modes=["text", "json", "yaml"]
+)
+```
+
+### Message Communication
+
+```python
+from agent2agent.types import Message, TextPart, Role, create_text_message
+
+# Create a simple message
+message = create_text_message(
+    text="Analyze pod connectivity issues",
+    role=Role.user,
+    context_id="troubleshooting-session-123"
+)
+
+# Create a complex message
+complex_message = Message(
+    message_id="req-12345",
+    role=Role.agent,
+    parts=[
+        TextPart(text="Pod analysis complete"),
+        TextPart(text="Recommendations: Scale cluster, check DNS")
+    ],
+    context_id="troubleshooting-session-123"
+)
+```
 
 ## Documentation
 

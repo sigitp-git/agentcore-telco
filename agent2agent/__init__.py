@@ -10,7 +10,9 @@ __author__ = "AWS Telco Infrastructure Team"
 
 # Import key components for easy access
 from .wrappers.eks_a2a_wrapper import EKSA2AWrapper
+from . import types
 
 __all__ = [
-    "EKSA2AWrapper"
+    "EKSA2AWrapper",
+    "types"
 ]

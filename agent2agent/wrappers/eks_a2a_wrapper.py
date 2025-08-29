@@ -9,7 +9,7 @@ from typing import Dict, Optional, Any, List
 from datetime import datetime
 
 # A2A imports
-from a2a.types import (
+from agent2agent.types import (
     AgentCard, AgentCapabilities, AgentSkill, AgentProvider,
     Message, TextPart, Role
 )

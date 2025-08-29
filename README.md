@@ -45,6 +45,12 @@ agentcore-telco/
 ├── vpc-agentcore/               # VPC Agent (same structure)
 ├── outposts-agentcore/          # Outposts Agent (same structure)
 ├── prometheus-agentcore/        # Prometheus Agent (same structure)
+├── awslabs-mcp-lambda/          # MCP (Model Context Protocol) Integration
+│   ├── MCP_INTEGRATION_GUIDE.md # Comprehensive MCP integration documentation
+│   ├── MCP_FIXES_SUMMARY.md     # Summary of MCP fixes and improvements
+│   └── mcp/                     # MCP configuration files
+│       ├── mcp.json             # Active MCP server configuration
+│       └── mcp.json.example     # Template MCP configuration
 └── agent2agent/                 # Agent2Agent protocol integration
     ├── README.md                # A2A documentation
     ├── QUICK_START.md           # Quick start guide
@@ -200,6 +206,10 @@ The project includes comprehensive MCP integration with AWS services through the
 - **aws-knowledge** (3 tools) - AWS knowledge base integration
 - **cloudwatch** (10 tools) - CloudWatch logs, metrics, and alarms
 - **ccapi** (14 tools) - AWS Cloud Control API for resource management
+
+📚 **For detailed MCP integration information, see:**
+- [MCP Integration Guide](awslabs-mcp-lambda/MCP_INTEGRATION_GUIDE.md) - Comprehensive setup and troubleshooting
+- [MCP Fixes Summary](awslabs-mcp-lambda/MCP_FIXES_SUMMARY.md) - Recent improvements and fixes
 
 ### SSM Parameters
 
@@ -547,6 +557,12 @@ These documents help AI assistants understand the project context, coding standa
 
 ## 📚 Additional Resources
 
+### Project Documentation
+- [MCP Integration Guide](awslabs-mcp-lambda/MCP_INTEGRATION_GUIDE.md) - Complete MCP setup and troubleshooting
+- [MCP Fixes Summary](awslabs-mcp-lambda/MCP_FIXES_SUMMARY.md) - Recent MCP improvements and fixes
+- [Agent2Agent Documentation](agent2agent/README.md) - Cross-agent communication protocol
+
+### External Resources
 - [AWS Bedrock AgentCore Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html)
 - [AWS Bedrock Documentation](https://docs.aws.amazon.com/bedrock/)
 - [Claude 3.5 Model Documentation](https://docs.anthropic.com/claude/docs)

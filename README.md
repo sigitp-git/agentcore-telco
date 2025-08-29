@@ -46,11 +46,11 @@ agentcore-telco/
 ├── outposts-agentcore/          # Outposts Agent (same structure)
 ├── prometheus-agentcore/        # Prometheus Agent (same structure)
 ├── awslabs-mcp-lambda/          # MCP (Model Context Protocol) Integration
-│   ├── MCP_INTEGRATION_GUIDE.md # Comprehensive MCP integration documentation
-│   ├── MCP_FIXES_SUMMARY.md     # Summary of MCP fixes and improvements
-│   └── mcp/                     # MCP configuration files
+│   └── mcp/                     # MCP configuration and documentation
 │       ├── mcp.json             # Active MCP server configuration
-│       └── mcp.json.example     # Template MCP configuration
+│       ├── mcp.json.example     # Template MCP configuration
+│       ├── MCP_INTEGRATION_GUIDE.md # Comprehensive MCP integration documentation
+│       └── MCP_FIXES_SUMMARY.md # Summary of MCP fixes and improvements
 └── agent2agent/                 # Agent2Agent protocol integration
     ├── README.md                # A2A documentation
     ├── QUICK_START.md           # Quick start guide
@@ -208,8 +208,8 @@ The project includes comprehensive MCP integration with AWS services through the
 - **ccapi** (14 tools) - AWS Cloud Control API for resource management
 
 📚 **For detailed MCP integration information, see:**
-- [MCP Integration Guide](awslabs-mcp-lambda/MCP_INTEGRATION_GUIDE.md) - Comprehensive setup and troubleshooting
-- [MCP Fixes Summary](awslabs-mcp-lambda/MCP_FIXES_SUMMARY.md) - Recent improvements and fixes
+- [MCP Integration Guide](awslabs-mcp-lambda/mcp/MCP_INTEGRATION_GUIDE.md) - Comprehensive setup and troubleshooting
+- [MCP Fixes Summary](awslabs-mcp-lambda/mcp/MCP_FIXES_SUMMARY.md) - Recent improvements and fixes
 
 ### SSM Parameters
 
@@ -558,8 +558,8 @@ These documents help AI assistants understand the project context, coding standa
 ## 📚 Additional Resources
 
 ### Project Documentation
-- [MCP Integration Guide](awslabs-mcp-lambda/MCP_INTEGRATION_GUIDE.md) - Complete MCP setup and troubleshooting
-- [MCP Fixes Summary](awslabs-mcp-lambda/MCP_FIXES_SUMMARY.md) - Recent MCP improvements and fixes
+- [MCP Integration Guide](awslabs-mcp-lambda/mcp/MCP_INTEGRATION_GUIDE.md) - Complete MCP setup and troubleshooting
+- [MCP Fixes Summary](awslabs-mcp-lambda/mcp/MCP_FIXES_SUMMARY.md) - Recent MCP improvements and fixes
 - [Agent2Agent Documentation](agent2agent/README.md) - Cross-agent communication protocol
 
 ### External Resources

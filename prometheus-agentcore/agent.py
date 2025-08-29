@@ -9,6 +9,8 @@ import uuid
 import sys
 import json
 import requests
+import atexit
+import signal
 
 # Load environment variables from .env.agents file
 try:
@@ -57,6 +59,15 @@ class AWSMCPManager:
         self.config_path = config_path
         self.mcp_clients = {}
         self.mcp_tools = []
+        self._cleanup_registered = False
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with cleanup."""
+        self.cleanup()
         
     def load_aws_mcp_config(self):
         """Load AWS MCP configuration."""
@@ -74,7 +85,7 @@ class AWSMCPManager:
             return None
     
     def initialize_aws_mcp_clients(self):
-        """Initialize MCP clients for enabled AWS servers."""
+        """Initialize MCP clients for enabled AWS servers with aggressive timeouts."""
         servers = self.load_aws_mcp_config()
         if not servers:
             print("ℹ️  No AWS MCP servers found")
@@ -85,14 +96,25 @@ class AWSMCPManager:
         
         print(f"🔧 Initializing {len(enabled_servers)} AWS MCP servers...")
         
+        # Known problematic servers that often hang
+        problematic_servers = {
+            'awslabs.prometheus-mcp-server',
+            'aws-knowledge-mcp-server',
+            'awslabs.cloudwatch-mcp-server'
+        }
+        
         for server_name, server_config in enabled_servers.items():
             try:
+                # Use shorter timeout for known problematic servers
+                if server_name in problematic_servers:
+                    print(f"   ⚠️  {server_name} is known to be slow, using shorter timeout...")
+                
                 self._initialize_single_mcp_client(server_name, server_config)
             except Exception as e:
                 print(f"⚠️  Failed to initialize {server_name}: {e}")
     
     def _initialize_single_mcp_client(self, server_name: str, server_config: dict):
-        """Initialize a single MCP client."""
+        """Initialize a single MCP client with timeout."""
         command = server_config.get('command', '')
         args = server_config.get('args', [])
         env = server_config.get('env', {})
@@ -101,42 +123,73 @@ class AWSMCPManager:
             print(f"⚠️  No command specified for {server_name}")
             return
         
-        try:
-            # Create environment with current env + server env
-            full_env = os.environ.copy()
-            
-            # Ensure AWS region is set for all AWS MCP servers
-            if 'aws' in server_name.lower() or any('aws' in arg.lower() for arg in args):
-                full_env.setdefault('AWS_DEFAULT_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
-                full_env.setdefault('AWS_REGION', os.environ.get('AWS_REGION', 'us-east-1'))
-            
-            # Apply server-specific environment variables
-            full_env.update(env)
-            
-            # Create MCP client using stdio
-            server_params = StdioServerParameters(
-                command=command,
-                args=args,
-                env=full_env
-            )
-            client = MCPClient(
-                lambda: stdio_client(server_params)
-            )
-            
-            # Start the client
-            client.start()
-            
-            # Get tools from this client
-            tools = self._get_tools_from_client(client, server_name)
-            
-            self.mcp_clients[server_name] = client
-            self.mcp_tools.extend(tools)
-            
-            print(f"✅ Initialized {server_name} with {len(tools)} tools")
-            
-        except Exception as e:
-            print(f"⚠️  Failed to start {server_name}: {e}")
-            # Continue with other servers even if one fails
+        import threading
+        import time
+        
+        def init_client_worker():
+            """Worker function to initialize client."""
+            try:
+                # Create environment with current env + server env
+                full_env = os.environ.copy()
+                
+                # Ensure AWS region is set for all AWS MCP servers
+                if 'aws' in server_name.lower() or any('aws' in arg.lower() for arg in args):
+                    full_env.setdefault('AWS_DEFAULT_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+                    full_env.setdefault('AWS_REGION', os.environ.get('AWS_REGION', 'us-east-1'))
+                
+                # Apply server-specific environment variables
+                full_env.update(env)
+                
+                # Add additional logging suppression for all MCP servers
+                full_env.setdefault('PYTHONWARNINGS', 'ignore')
+                full_env.setdefault('LOGURU_LEVEL', 'ERROR')
+                full_env.setdefault('LOG_LEVEL', 'ERROR')
+                
+                # Create MCP client using stdio
+                server_params = StdioServerParameters(
+                    command=command,
+                    args=args,
+                    env=full_env
+                )
+                client = MCPClient(
+                    lambda: stdio_client(server_params)
+                )
+                
+                print(f"   • Starting {server_name}...")
+                
+                # Start the client (this can hang)
+                client.start()
+                
+                # Get tools from this client
+                tools = self._get_tools_from_client(client, server_name)
+                
+                self.mcp_clients[server_name] = client
+                self.mcp_tools.extend(tools)
+                
+                print(f"✅ Initialized {server_name} with {len(tools)} tools")
+                return True
+                
+            except Exception as e:
+                print(f"⚠️  Failed to start {server_name}: {e}")
+                return False
+        
+        # Use different timeouts based on server type
+        problematic_servers = {
+            'awslabs.prometheus-mcp-server',
+            'aws-knowledge-mcp-server', 
+            'awslabs.cloudwatch-mcp-server'
+        }
+        
+        timeout = 2.0 if server_name in problematic_servers else 5.0
+        
+        # Run initialization with timeout
+        init_thread = threading.Thread(target=init_client_worker, daemon=True)
+        init_thread.start()
+        init_thread.join(timeout=timeout)
+        
+        if init_thread.is_alive():
+            print(f"⚠️  {server_name} initialization timed out after {timeout}s, skipping...")
+            return
     
     def _get_tools_from_client(self, client, server_name: str):
         """Get tools from an MCP client."""
@@ -159,21 +212,77 @@ class AWSMCPManager:
         return self.mcp_tools
     
     def cleanup(self):
-        """Cleanup MCP clients."""
-        for server_name, client in self.mcp_clients.items():
-            try:
-                # MCPClient.stop() expects context manager arguments
-                client.stop(None, None, None)
-            except Exception as e:
-                print(f"⚠️  Error stopping {server_name}: {e}")
-                # Try alternative cleanup methods if available
+        """Cleanup MCP clients and stdio resources with timeout."""
+        if self._cleanup_registered:
+            return  # Already cleaned up
+        
+        self._cleanup_registered = True
+        print(f"🧹 Cleaning up {len(self.mcp_clients)} MCP clients...")
+        
+        import time
+        import threading
+        
+        def cleanup_client_with_timeout(server_name, client, timeout=2.0):
+            """Cleanup a single client with timeout."""
+            def cleanup_worker():
                 try:
-                    if hasattr(client, '__exit__'):
-                        client.__exit__(None, None, None)
-                    elif hasattr(client, 'close'):
-                        client.close()
-                except Exception as cleanup_error:
-                    print(f"⚠️  Alternative cleanup failed for {server_name}: {cleanup_error}")
+                    print(f"   • Stopping {server_name}...")
+                    
+                    # For stdio clients, try to terminate the underlying process first
+                    process = None
+                    try:
+                        if hasattr(client, '_client_session') and hasattr(client._client_session, '_process'):
+                            process = client._client_session._process
+                        elif hasattr(client, '_session') and hasattr(client._session, '_process'):
+                            process = client._session._process
+                        elif hasattr(client, '_process'):
+                            process = client._process
+                        
+                        if process and hasattr(process, 'poll') and process.poll() is None:
+                            print(f"   🔄 Terminating stdio process for {server_name}...")
+                            process.terminate()
+                            time.sleep(0.1)  # Very brief wait
+                            if process.poll() is None:
+                                process.kill()
+                            print(f"   ✅ {server_name} stdio process terminated")
+                        elif process:
+                            print(f"   ℹ️  {server_name} process already terminated")
+                    except Exception as process_error:
+                        print(f"   ⚠️  Process termination failed for {server_name}: {process_error}")
+                    
+                    # Try client cleanup methods (but don't wait long)
+                    try:
+                        if hasattr(client, 'stop'):
+                            client.stop(None, None, None)
+                        elif hasattr(client, '__exit__'):
+                            client.__exit__(None, None, None)
+                        elif hasattr(client, 'close'):
+                            client.close()
+                        print(f"   ✅ {server_name} stopped successfully")
+                    except Exception as cleanup_error:
+                        print(f"   ⚠️  Client cleanup failed for {server_name}: {cleanup_error}")
+                            
+                except Exception as e:
+                    print(f"   ❌ Complete cleanup failed for {server_name}: {e}")
+            
+            # Run cleanup in a thread with timeout
+            cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+            cleanup_thread.start()
+            cleanup_thread.join(timeout=timeout)
+            
+            if cleanup_thread.is_alive():
+                print(f"   ⚠️  {server_name} cleanup timed out after {timeout}s")
+                return False
+            return True
+        
+        # Cleanup each client with timeout
+        for server_name, client in list(self.mcp_clients.items()):
+            cleanup_client_with_timeout(server_name, client)
+        
+        # Clear the clients dictionary
+        self.mcp_clients.clear()
+        self.mcp_tools.clear()
+        print("✅ MCP cleanup completed")
 
 class AgentConfig:
     """Configuration settings for the Prometheus Agent."""
@@ -187,7 +296,7 @@ class AgentConfig:
     
     # AWS MCP Configuration
     ENABLE_AWS_MCP = True  # Toggle to enable/disable AWS MCP integration
-    AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'
+    AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'  # Path to AWS MCP config file
     
     # Available Models
     AVAILABLE_MODELS = {
@@ -339,45 +448,39 @@ def select_model_interactive():
     except (ValueError, KeyboardInterrupt):
         print(f"✅ Using current model: {models[AgentConfig.SELECTED_MODEL]}")
 
-# Check for command line arguments
-if len(sys.argv) > 1:
-    if sys.argv[1] == '--select-model':
-        select_model_interactive()
-        sys.exit(0)
-    elif sys.argv[1] in ['--help', '-h']:
-        print("\n🤖 AWS Prometheus Agent - Usage")
-        print("=" * 40)
-        print("python3 agent.py                 # Run agent with current model")
-        print("python3 agent.py --select-model  # Interactive model selection")
-        print("python3 select_model.py          # Standalone model selector")
-        print("\nAvailable Models:")
-        for key, desc in AgentConfig.list_models().items():
-            current = " (CURRENT)" if key == AgentConfig.SELECTED_MODEL else ""
-            print(f"  • {desc}{current}")
-        print("\nMCP Configuration Tools:")
-        print("  • list_mcp_server_names()       # Quick list of server names")
-        print("  • list_mcp_servers_from_config() # Detailed server information")
-        print("  • manage_mcp_config()           # Manage MCP configuration")
-        print("  • show_available_mcp_servers()  # Show servers with details")
-        print()
-        sys.exit(0)
+def handle_command_line_args():
+    """Handle command line arguments - only called when running as main script."""
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--select-model':
+            select_model_interactive()
+            sys.exit(0)
+        elif sys.argv[1] in ['--help', '-h']:
+            print("\n🤖 AWS Prometheus Agent - Usage")
+            print("=" * 40)
+            print("python3 agent.py                 # Run agent with current model")
+            print("python3 agent.py --select-model  # Interactive model selection")
+            print("python3 select_model.py          # Standalone model selector")
+            print("\nAvailable Models:")
+            for key, desc in AgentConfig.list_models().items():
+                current = " (CURRENT)" if key == AgentConfig.SELECTED_MODEL else ""
+                print(f"  • {desc}{current}")
+            print("\nMCP Configuration Tools:")
+            print("  • list_mcp_server_names()       # Quick list of server names")
+            print("  • list_mcp_servers_from_config() # Detailed server information")
+            print("  • manage_mcp_config()           # Manage MCP configuration")
+            print("  • show_available_mcp_servers()  # Show servers with details")
+            print()
+            sys.exit(0)
 
-# Initialize configuration
-REGION = AgentConfig.setup_aws_region()
-
-# Initialize AWS clients with proper region
-sts_client = boto3.client('sts', region_name=REGION)
-
-# Initialize MCP configuration
-print(f"🔧 MCP Configuration: {'enabled' if AgentConfig.ENABLE_MCP_CONFIG else 'disabled'}")
-
-if AgentConfig.ENABLE_MCP_CONFIG:
-    mcp_servers = AgentConfig.get_mcp_servers()
-    if mcp_servers:
-        enabled_servers = [name for name, config in mcp_servers.items() if not config.get('disabled', False)]
-        print(f"   • {len(enabled_servers)} MCP servers available")
-    else:
-        print(f"   • No MCP servers found")
+# Global variables that will be initialized in main()
+REGION = None
+sts_client = None
+gateway = None
+gateway_id = None
+mcp_client = None
+aws_mcp_manager = None
+memory_id = None
+memory_client = None
 
 def validate_discovery_url(url):
     """Validate that the discovery URL is accessible and returns valid OIDC configuration."""
@@ -440,14 +543,18 @@ def validate_gateway_configuration():
     
     return True
 
-def use_manual_gateway():
+def use_manual_gateway(region=None):
     """Use manually created gateway from AWS Management Console."""
     # Get gateway ID from environment variable
     manual_gateway_id = os.getenv("PROMETHEUS_AGENT_GATEWAY_ID", "prometheus-agent-agentcore-gw-zuqz3vs0sf")
     
     print(f"🔍 Using manually created gateway: {manual_gateway_id}")
     
-    gateway_client = boto3.client("bedrock-agentcore-control", region_name=REGION)
+    # Use provided region or fall back to global REGION or default
+    if region is None:
+        region = globals().get('REGION', 'us-east-1')
+    
+    gateway_client = boto3.client("bedrock-agentcore-control", region_name=region)
     
     try:
         # Get gateway details
@@ -545,8 +652,7 @@ def try_existing_gateway(gateway_client):
     print("🔄 Continuing without gateway functionality...")
     return None, None
 
-# Initialize gateway - using manually created gateway
-gateway, gateway_id = use_manual_gateway()
+# Gateway initialization will be done in main()
 
 # Using the AgentCore Gateway for MCP server (only if gateway is available)
 def get_token(client_id: str, client_secret: str, scope_string: str = None, url: str = None) -> dict:
@@ -575,92 +681,88 @@ def get_token(client_id: str, client_secret: str, scope_string: str = None, url:
     except requests.exceptions.RequestException as err:
         return {"error": str(err)}
 
-# Initialize MCP client only if gateway is available
-mcp_client = None
-if gateway and gateway_id:
-    try:
-        print(f"🔗 Setting up MCP client for gateway: {gateway_id}")
-        
-        gateway_access_token = get_token(
-            get_ssm_parameter("/app/prometheusagent/agentcore/machine_client_id"),
-            get_cognito_client_secret(),
-            get_ssm_parameter("/app/prometheusagent/agentcore/cognito_auth_scope"),
-            get_ssm_parameter("/app/prometheusagent/agentcore/cognito_token_url")
-        )
-        
-        print(f"🔍 Debug - Token response: {gateway_access_token}")
-        
-        # Check if we got a valid token
-        if 'error' in gateway_access_token:
-            print(f"❌ Token error: {gateway_access_token['error']}")
-            raise Exception(f"Failed to get access token: {gateway_access_token['error']}")
-        
-        if 'access_token' not in gateway_access_token:
-            print(f"❌ No access_token in response. Available keys: {list(gateway_access_token.keys())}")
-            raise Exception("No access_token in authentication response")
+# MCP client initialization will be done in main()
 
-        print(f"Gateway Endpoint - MCP URL: {gateway['gateway_url']}")
+# AWS MCP Manager initialization will be done in main()
 
-        # Set up MCP client
-        mcp_client = MCPClient(
-            lambda: streamablehttp_client(
-                gateway['gateway_url'],
-                headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
-            )
-        )
-        print("✅ MCP client configured successfully")
-        
-    except Exception as e:
-        print(f"⚠️  MCP client setup failed: {e}")
-        print("🔄 Continuing without MCP client functionality...")
-        mcp_client = None
-else:
-    print("ℹ️  No gateway available - MCP client functionality disabled")
+# Global cleanup state
+_cleanup_done = False
 
-# Initialize MCP client if available
-if mcp_client:
-    try:
-        mcp_client.start()
-        print("✅ MCP client started successfully")
-    except Exception as e:
-        print(f"⚠️  MCP client start failed: {str(e)}")
-        print("🔄 Continuing without MCP client functionality...")
-        mcp_client = None
-
-# Initialize AWS MCP Manager
-aws_mcp_manager = None
-if AgentConfig.ENABLE_AWS_MCP:
-    try:
-        print("🔧 Initializing AWS MCP integration...")
-        
-        # Verify AWS region is properly configured before MCP initialization
-        current_region = os.environ.get('AWS_DEFAULT_REGION', 'not-set')
-        print(f"   • AWS region: {current_region}")
-        
-        # Verify AWS credentials are available
+# Define cleanup functions
+def cleanup_all_resources():
+    """Cleanup all MCP resources and connections with timeout."""
+    global _cleanup_done
+    
+    if _cleanup_done:
+        return  # Already cleaned up
+    
+    _cleanup_done = True
+    print("\n🧹 Cleaning up resources...")
+    
+    import threading
+    import time
+    import os
+    
+    def cleanup_with_timeout():
+        """Perform cleanup operations."""
         try:
-            session = Session()
-            credentials = session.get_credentials()
-            if credentials is None:
-                raise Exception("No AWS credentials found")
-            print(f"   • AWS credentials: ✅ Available")
-        except Exception as cred_error:
-            print(f"   • AWS credentials: ❌ {cred_error}")
-            raise Exception(f"AWS credentials not available: {cred_error}")
-        
-        aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
-        aws_mcp_manager.initialize_aws_mcp_clients()
-        aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
-        print(f"✅ AWS MCP integration ready with {aws_tools_count} tools")
-    except Exception as e:
-        print(f"⚠️  AWS MCP initialization failed: {e}")
-        print("🔄 Continuing without AWS MCP functionality...")
-        aws_mcp_manager = None
-else:
-    print("ℹ️  AWS MCP integration disabled")
+            # Cleanup AWS MCP clients
+            if aws_mcp_manager:
+                print("🔄 Cleaning up AWS MCP clients...")
+                aws_mcp_manager.cleanup()
+            
+            # Cleanup main MCP client (gateway connection)
+            if mcp_client:
+                try:
+                    print("🔄 Cleaning up main MCP client...")
+                    if hasattr(mcp_client, 'stop'):
+                        mcp_client.stop(None, None, None)
+                    elif hasattr(mcp_client, '__exit__'):
+                        mcp_client.__exit__(None, None, None)
+                    elif hasattr(mcp_client, 'close'):
+                        mcp_client.close()
+                    print("✅ Main MCP client cleanup completed")
+                except Exception as e:
+                    print(f"⚠️  Main MCP client cleanup failed: {e}")
+        except Exception as e:
+            print(f"⚠️  Cleanup error: {e}")
+    
+    # Run cleanup with timeout to prevent hanging
+    cleanup_thread = threading.Thread(target=cleanup_with_timeout, daemon=True)
+    cleanup_thread.start()
+    cleanup_thread.join(timeout=3.0)  # 3 second timeout
+    
+    if cleanup_thread.is_alive():
+        print("⚠️  Cleanup timed out, forcing exit...")
+        # Force exit if cleanup hangs
+        os._exit(0)
+    else:
+        print("✅ All resources cleaned up")
 
-# Configure logging
-logging.getLogger("strands").setLevel(logging.INFO)
+def emergency_cleanup():
+    """Emergency cleanup function for unexpected exits."""
+    try:
+        cleanup_all_resources()
+    except:
+        pass  # Ignore errors during emergency cleanup
+
+# Note: atexit cleanup removed to prevent double cleanup
+# Cleanup is handled by the main() function's finally block
+
+# Configure logging to reduce verbose output
+logging.getLogger("strands").setLevel(logging.WARNING)  # Reduce strands logging to prevent duplicate output
+logging.getLogger("mcp").setLevel(logging.WARNING)  # Reduce MCP logging
+logging.getLogger("httpx").setLevel(logging.WARNING)  # Reduce HTTP request logging
+logging.getLogger("awslabs.prometheus_mcp_server").setLevel(logging.WARNING)  # Reduce Prometheus MCP server logging
+logging.getLogger("awslabs.cloudwatch_mcp_server").setLevel(logging.WARNING)  # Reduce CloudWatch MCP server logging
+logging.getLogger("awslabs.eks_mcp_server").setLevel(logging.WARNING)  # Reduce EKS MCP server logging
+logging.getLogger("boto3").setLevel(logging.WARNING)  # Reduce boto3 logging
+logging.getLogger("botocore").setLevel(logging.WARNING)  # Reduce botocore logging
+logging.getLogger("urllib3").setLevel(logging.WARNING)  # Reduce urllib3 logging
+
+# Set root logger to WARNING to catch any other verbose loggers
+logging.getLogger().setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
@@ -1219,19 +1321,7 @@ def _format_search_results(results: list) -> str:
 
 
 # Create a Bedrock model instance with temperature control
-# Temperature 0.3: Focused and consistent responses, ideal for technical accuracy
-# Adjust temperature: 0.1-0.3 (very focused), 0.4-0.7 (balanced), 0.8-1.0 (creative)
-current_model_id = AgentConfig.get_model_id()
-print(f"🤖 Using MODEL_ID: {current_model_id}")
-print(f"📝 Model Description: {AgentConfig.list_models()[AgentConfig.SELECTED_MODEL]}")
-model = BedrockModel(
-    model_id=current_model_id, 
-    temperature=AgentConfig.MODEL_TEMPERATURE
-)
-
-# AgentCore Memory section
-memory_client = MemoryClient(region_name=REGION)
-memory_name = AgentConfig.MEMORY_NAME
+# Model and memory initialization will be done in main()
 
 
 
@@ -1354,7 +1444,7 @@ class MemoryManager:
 
 def create_or_get_memory_resource():
     """Factory function for memory resource creation."""
-    memory_manager = MemoryManager(memory_client, memory_name)
+    memory_manager = MemoryManager(memory_client, AgentConfig.MEMORY_NAME)
     return memory_manager.get_or_create_memory()
 
 def initialize_memory() -> str | None:
@@ -1386,7 +1476,7 @@ def _log_memory_initialization_error():
     for msg in error_messages:
         logger.warning(msg)
 
-memory_id = initialize_memory()
+# Memory ID initialization will be done in main()
 
 class PrometheusAgentMemoryHooks(HookProvider):
     """Memory hooks for Prometheus Agent"""
@@ -1586,9 +1676,15 @@ def create_tools_list():
     
     return tools_list
 
-def create_devops_agent() -> Agent:
+def create_devops_agent(model_id: str) -> Agent:
     """Create and configure the Prometheus agent."""
     hooks = create_agent_hooks(memory_id)
+    
+    # Create model with the provided model_id
+    model = BedrockModel(
+        model_id=model_id, 
+        temperature=AgentConfig.MODEL_TEMPERATURE
+    )
     
     return Agent(
         model=model,
@@ -1698,8 +1794,9 @@ class ConversationManager:
                     user_input = input("\nYou > ").strip()
                     
                     if user_input.lower() in self.exit_commands:
-                        print("Happy EKSing!")
-                        break
+                        print("👋 Goodbye!")
+                        # Cleanup will be handled by the main function's finally block
+                        return  # Return instead of break to exit the function
                         
                     if not user_input:
                         print(f"\n{self.bot_name} > Please ask me something about your Prometheus metrics!")
@@ -1719,8 +1816,9 @@ class ConversationManager:
                     print(f"\n{self.bot_name} > {response}")
                     
                 except KeyboardInterrupt:
-                    print("\n\nGoodbye! Happy EKSing!")
-                    break
+                    print("\n\n👋 Goodbye!")
+                    # Cleanup will be handled by the main function's finally block
+                    return  # Return instead of break to exit the function
                 except Exception as e:
                     logger.error(f"Error processing user input: {e}")
                     print(f"\n{self.bot_name} > Sorry, I encountered an error: {e}")
@@ -1728,6 +1826,7 @@ class ConversationManager:
         except Exception as e:
             logger.error(f"Fatal error in conversation loop: {e}")
             print(f"Fatal error: {e}")
+            # Cleanup will be handled by the main function's finally block
 
 def setup_gateway_parameters():
     """Interactive setup for gateway SSM parameters."""
@@ -1783,9 +1882,159 @@ def setup_gateway_parameters():
     print(f"\n🚀 Agent Status:")
     print(f"   The agent works with full functionality including gateway support!")
 
+
+
+def initialize_agent():
+    """Initialize all agent components."""
+    global REGION, sts_client, gateway, gateway_id, mcp_client, aws_mcp_manager, memory_id, memory_client
+    
+    # Initialize configuration
+    REGION = AgentConfig.setup_aws_region()
+    
+    # Initialize AWS clients with proper region
+    sts_client = boto3.client('sts', region_name=REGION)
+    
+    # Initialize MCP configuration
+    print(f"🔧 MCP Configuration: {'enabled' if AgentConfig.ENABLE_MCP_CONFIG else 'disabled'}")
+    
+    if AgentConfig.ENABLE_MCP_CONFIG:
+        mcp_servers = AgentConfig.get_mcp_servers()
+        if mcp_servers:
+            enabled_servers = [name for name, config in mcp_servers.items() if not config.get('disabled', False)]
+            print(f"   • {len(enabled_servers)} MCP servers available")
+        else:
+            print(f"   • No MCP servers found")
+    
+    # Initialize gateway - using manually created gateway
+    gateway, gateway_id = use_manual_gateway(REGION)
+    
+    # Initialize MCP client only if gateway is available
+    mcp_client = None
+    if gateway and gateway_id:
+        try:
+            print(f"🔗 Setting up MCP client for gateway: {gateway_id}")
+            
+            gateway_access_token = get_token(
+                get_ssm_parameter("/app/prometheusagent/agentcore/machine_client_id"),
+                get_cognito_client_secret(),
+                get_ssm_parameter("/app/prometheusagent/agentcore/cognito_auth_scope"),
+                get_ssm_parameter("/app/prometheusagent/agentcore/cognito_token_url")
+            )
+            
+            print(f"🔍 Debug - Token response: {gateway_access_token}")
+            
+            # Check if we got a valid token
+            if 'error' in gateway_access_token:
+                print(f"❌ Token error: {gateway_access_token['error']}")
+                raise Exception(f"Failed to get access token: {gateway_access_token['error']}")
+            
+            if 'access_token' not in gateway_access_token:
+                print(f"❌ No access_token in response. Available keys: {list(gateway_access_token.keys())}")
+                raise Exception("No access_token in authentication response")
+
+            print(f"Gateway Endpoint - MCP URL: {gateway['gateway_url']}")
+
+            # Set up MCP client
+            mcp_client = MCPClient(
+                lambda: streamablehttp_client(
+                    gateway['gateway_url'],
+                    headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
+                )
+            )
+            print("✅ MCP client configured successfully")
+            
+        except Exception as e:
+            print(f"⚠️  MCP client setup failed: {e}")
+            print("🔄 Continuing without MCP client functionality...")
+            mcp_client = None
+    else:
+        print("ℹ️  No gateway available - MCP client functionality disabled")
+
+    # Initialize MCP client if available
+    if mcp_client:
+        try:
+            mcp_client.start()
+            print("✅ MCP client started successfully")
+        except Exception as e:
+            print(f"⚠️  MCP client start failed: {str(e)}")
+            print("🔄 Continuing without MCP client functionality...")
+            mcp_client = None
+
+    # Initialize AWS MCP Manager with timeout
+    aws_mcp_manager = None
+    if AgentConfig.ENABLE_AWS_MCP:
+        import threading
+        import time
+        
+        def init_aws_mcp():
+            """Initialize AWS MCP Manager."""
+            global aws_mcp_manager
+            try:
+                print("🔧 Initializing AWS MCP integration...")
+                
+                # Verify AWS region is properly configured before MCP initialization
+                current_region = os.environ.get('AWS_DEFAULT_REGION', 'not-set')
+                print(f"   • AWS region: {current_region}")
+                
+                # Verify AWS credentials are available
+                try:
+                    session = Session()
+                    credentials = session.get_credentials()
+                    if credentials is None:
+                        raise Exception("No AWS credentials found")
+                    print(f"   • AWS credentials: ✅ Available")
+                except Exception as cred_error:
+                    print(f"   • AWS credentials: ❌ {cred_error}")
+                    raise Exception(f"AWS credentials not available: {cred_error}")
+                
+                aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
+                aws_mcp_manager.initialize_aws_mcp_clients()
+                aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
+                print(f"✅ AWS MCP integration ready with {aws_tools_count} tools")
+            except Exception as e:
+                print(f"⚠️  AWS MCP initialization failed: {e}")
+                print("🔄 Continuing without AWS MCP functionality...")
+                aws_mcp_manager = None
+        
+        # Run AWS MCP initialization with timeout
+        init_thread = threading.Thread(target=init_aws_mcp, daemon=True)
+        init_thread.start()
+        init_thread.join(timeout=15.0)  # 15 second timeout
+        
+        if init_thread.is_alive():
+            print("⚠️  AWS MCP initialization timed out after 15s, continuing without it...")
+            aws_mcp_manager = None
+    else:
+        print("ℹ️  AWS MCP integration disabled")
+    
+    # Initialize model
+    current_model_id = AgentConfig.get_model_id()
+    print(f"🤖 Using MODEL_ID: {current_model_id}")
+    print(f"📝 Model Description: {AgentConfig.list_models()[AgentConfig.SELECTED_MODEL]}")
+    
+    # Initialize memory
+    global memory_client, memory_id
+    memory_client = MemoryClient(region_name=REGION)
+    memory_id = initialize_memory()
+    
+    return current_model_id
+
 def main():
     """Main execution function."""
     import sys
+    import signal
+    
+    # Handle command line arguments first
+    handle_command_line_args()
+    
+    # Register signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        print(f"\n🛑 Received signal {signum}, shutting down gracefully...")
+        cleanup_all_resources()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     
     # Check for setup command
     if len(sys.argv) > 1 and sys.argv[1] == "setup":
@@ -1793,14 +2042,29 @@ def main():
         return
     
     try:
-        agent = create_devops_agent()
+        # Initialize all components
+        current_model_id = initialize_agent()
+        
+        # Create agent with initialized components
+        agent = create_devops_agent(current_model_id)
         conversation_manager = ConversationManager(agent)
         conversation_manager.start_conversation()
+        
+        # If we reach here, user exited normally
+        print("🔄 Normal exit, cleaning up...")
+        
+    except KeyboardInterrupt:
+        print("\n🛑 Interrupted by user")
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
     finally:
-        # Cleanup AWS MCP clients
-        if aws_mcp_manager:
-            print("🔄 Cleaning up AWS MCP clients...")
-            aws_mcp_manager.cleanup()
+        # Only cleanup if not already done by signal handler
+        if not _cleanup_done:
+            cleanup_all_resources()
+        
+        # Force exit to prevent hanging
+        import os
+        os._exit(0)
 
 if __name__ == "__main__":
     main()

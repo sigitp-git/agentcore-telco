@@ -155,6 +155,52 @@ PROMETHEUS_AGENT_RUNTIME_ARN=arn:aws:bedrock-agentcore:us-east-1:ACCOUNT:runtime
 PROMETHEUS_AGENT_GATEWAY_ID=prometheus-agent-agentcore-gw-ID
 ```
 
+### MCP (Model Context Protocol) Configuration
+
+The project includes comprehensive MCP integration with AWS services through the `awslabs-mcp-lambda/mcp/mcp.json` configuration file:
+
+```json
+{
+    "mcpServers": {
+        "awslabs.core-mcp-server": {
+            "command": "uvx",
+            "args": ["awslabs.core-mcp-server@latest"],
+            "env": {
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": []
+        },
+        "awslabs.prometheus-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.prometheus-mcp-server@latest",
+                "--url", "https://aps-workspaces.us-east-1.amazonaws.com/workspaces/WORKSPACE_ID",
+                "--region", "us-east-1"
+            ],
+            "env": {
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": ["GetAvailableWorkspaces", "ListMetrics", "ExecuteQuery"]
+        }
+    }
+}
+```
+
+**Available MCP Servers (52 tools total):**
+- **core** (1 tool) - Core MCP functionality
+- **aws-documentation** (3 tools) - AWS documentation search and retrieval
+- **eks** (16 tools) - EKS cluster management and Kubernetes operations
+- **prometheus** (5 tools) - Prometheus metrics and query execution
+- **aws-knowledge** (3 tools) - AWS knowledge base integration
+- **cloudwatch** (10 tools) - CloudWatch logs, metrics, and alarms
+- **ccapi** (14 tools) - AWS Cloud Control API for resource management
+
 ### SSM Parameters
 
 Each agent requires specific SSM parameters for authentication and configuration:
@@ -207,11 +253,15 @@ Each agent requires specific SSM parameters for authentication and configuration
 - **Maintenance**: Coordinate updates and maintenance windows
 
 ### Prometheus Agent
-- **Metrics Collection**: Configure Prometheus data sources
-- **Query Optimization**: Write and optimize PromQL queries
-- **Alerting**: Set up and manage alert rules
-- **Visualization**: Integration with Grafana and dashboards
-- **Troubleshooting**: Diagnose monitoring and alerting issues
+- **Metrics Collection**: Configure Prometheus data sources and Amazon Managed Prometheus
+- **Query Optimization**: Write and optimize PromQL queries with real-time execution
+- **MCP Integration**: 52 AWS MCP tools for comprehensive AWS service integration
+- **Workspace Management**: Automatic detection and management of Prometheus workspaces
+- **Real-time Queries**: Execute PromQL queries against live Prometheus instances
+- **Alerting**: Set up and manage alert rules and notification channels
+- **Visualization**: Integration with Grafana and custom dashboards
+- **Troubleshooting**: Diagnose monitoring, alerting, and MCP integration issues
+- **AWS Services**: Direct integration with EKS, CloudWatch, and AWS documentation
 
 ## 🛠️ Usage
 
@@ -295,7 +345,14 @@ Access at: http://localhost:8501
 
 ## 🔄 Recent Updates
 
-### Agent2Agent Integration Fixes (Latest)
+### MCP Tools Integration Fixes (Latest)
+- ✅ **Fixed MCP Loading**: Resolved MCP tools not loading from mcp.json configuration
+- ✅ **Eliminated Duplicate Output**: Fixed verbose logging causing duplicate responses
+- ✅ **Enhanced Logging Control**: Added comprehensive logging suppression for clean output
+- ✅ **52 AWS MCP Tools**: Successfully loading all MCP servers (core, aws-documentation, eks, prometheus, aws-knowledge, cloudwatch, ccapi)
+- ✅ **Prometheus Agent**: Full MCP integration with Amazon Managed Prometheus
+
+### Agent2Agent Integration Fixes
 - ✅ **Fixed Import Issues**: Resolved `ModuleNotFoundError: No module named 'a2a'`
 - ✅ **Complete Type System**: Added comprehensive `agent2agent.types` module
 - ✅ **Protocol Validation**: Type-safe A2A communication with validation
@@ -303,6 +360,8 @@ Access at: http://localhost:8501
 - ✅ **Working Examples**: All A2A integration examples now run successfully
 
 ### Key Improvements
+- **MCP Integration**: Full Model Context Protocol support with 52 AWS tools
+- **Clean Output**: Eliminated duplicate logging and verbose MCP server output
 - **Type Safety**: Full type definitions for AgentCard, Message, Capabilities
 - **Error Handling**: Proper validation and error messages for A2A types
 - **Documentation**: Complete documentation updates across all modules

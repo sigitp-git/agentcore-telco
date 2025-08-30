@@ -361,9 +361,9 @@ class AgentConfig:
         }
     
     # Model Settings
-    MODEL_TEMPERATURE = 0.3 # Controls randomness in responses (0.3 is fairly deterministic, good for consistent outputs)
-    MAX_TOKENS = 4096  # Model response limit, sufficient for detailed EKS troubleshooting and analysis
-    TOP_P = 0.9        # Considering tokens that make up 90% of the probability mass, balances creativity for problem-solving while maintaining technical accuracy
+    MODEL_TEMPERATURE = 0.3  # Controls randomness in responses (0.3 is fairly deterministic, good for consistent outputs)
+    MAX_TOKENS = 4096        # Model response limit, sufficient for detailed EKS troubleshooting and analysis
+    TOP_P = 0.9              # Considering tokens that make up 90% of the probability mass, balances creativity for problem-solving while maintaining technical accuracy
     
     # Memory Settings
     MEMORY_NAME = "EKSAgentMemory"
@@ -621,8 +621,8 @@ def use_manual_gateway(region=None):
 #     gateway_name = "eksagent-agentcore-gw"
 #     
 #     # Get configuration
-#     discovery_url = get_ssm_parameter("/app/eksagent/agentcore/cognito_discovery_url")
-#     client_id = get_ssm_parameter("/app/eksagent/agentcore/machine_client_id")
+#     discovery_url = get_ssm_parameter("/app/devopsagent/agentcore/cognito_discovery_url")
+#     client_id = get_ssm_parameter("/app/devopsagent/agentcore/machine_client_id")
 #     
 #     auth_config = {
 #         "customJWTAuthorizer": {
@@ -774,32 +774,199 @@ def emergency_cleanup():
     except:
         pass  # Ignore errors during emergency cleanup
 
-# Register emergency cleanup for unexpected exits
-atexit.register(emergency_cleanup)
+# Note: atexit cleanup removed to prevent double cleanup
+# Cleanup is handled by the main() function's finally block
 
-# Configure logging
-logging.getLogger("strands").setLevel(logging.INFO)
+# Configure logging to reduce verbose output
+logging.getLogger("strands").setLevel(logging.WARNING)  # Reduce strands logging to prevent duplicate output
+logging.getLogger("mcp").setLevel(logging.WARNING)  # Reduce MCP logging
+logging.getLogger("httpx").setLevel(logging.WARNING)  # Reduce HTTP request logging
+logging.getLogger("awslabs.prometheus_mcp_server").setLevel(logging.WARNING)  # Reduce Prometheus MCP server logging
+logging.getLogger("awslabs.cloudwatch_mcp_server").setLevel(logging.WARNING)  # Reduce CloudWatch MCP server logging
+logging.getLogger("awslabs.eks_mcp_server").setLevel(logging.WARNING)  # Reduce EKS MCP server logging
+logging.getLogger("boto3").setLevel(logging.WARNING)  # Reduce boto3 logging
+logging.getLogger("botocore").setLevel(logging.WARNING)  # Reduce botocore logging
+logging.getLogger("urllib3").setLevel(logging.WARNING)  # Reduce urllib3 logging
+
+# Set root logger to WARNING to catch any other verbose loggers
+logging.getLogger().setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
 # Define a websearch tool
 @tool
-def list_mcp_tools() -> str:
-    """List all available MCP tools and their descriptions.
+def list_mcp_server_names() -> str:
+    """Get a quick list of all MCP server names from the configuration file.
     
     Returns:
-        Formatted list of MCP tools with descriptions
+        Simple list of MCP server names with their status
+    """
+    if not AgentConfig.ENABLE_MCP_CONFIG:
+        return "❌ MCP configuration loading is disabled."
+    
+    servers = AgentConfig.get_mcp_servers()
+    if not servers:
+        return "ℹ️  No MCP servers found in configuration file."
+    
+    enabled_servers = []
+    disabled_servers = []
+    
+    for name, config in servers.items():
+        if config.get('disabled', False):
+            disabled_servers.append(name)
+        else:
+            enabled_servers.append(name)
+    
+    result = f"📋 **MCP Server Names ({len(servers)} total):**\n\n"
+    
+    if enabled_servers:
+        result += f"🟢 **Enabled ({len(enabled_servers)}):**\n"
+        for i, name in enumerate(enabled_servers, 1):
+            result += f"{i:2d}. {name}\n"
+        result += "\n"
+    
+    if disabled_servers:
+        result += f"🔴 **Disabled ({len(disabled_servers)}):**\n"
+        for i, name in enumerate(disabled_servers, 1):
+            result += f"{i:2d}. {name}\n"
+    
+    return result
+
+@tool
+def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
+    """Manage MCP configuration settings.
+    
+    Args:
+        action: Action to perform - 'status', 'enable', 'disable', 'list_servers', 'server_status', 'aws_status'
+        server_name: Name of specific MCP server (for server_status action)
+        
+    Returns:
+        Status information or configuration details
+    """
+    if action == "status":
+        status = "enabled" if AgentConfig.ENABLE_MCP_CONFIG else "disabled"
+        config_path = AgentConfig.MCP_CONFIG_PATH
+        config_exists = os.path.exists(config_path)
+        
+        result = f"🔧 **MCP Configuration Status:**\n\n"
+        result += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'}\n"
+        result += f"• AWS MCP Integration: {'🟢 Active' if aws_mcp_manager else '🔴 Inactive'}\n"
+        result += f"• Configuration Loading: {status}\n"
+        result += f"• Config File Path: {config_path}\n"
+        result += f"• Config File Exists: {'✅ Yes' if config_exists else '❌ No'}\n"
+        
+        if config_exists and AgentConfig.ENABLE_MCP_CONFIG:
+            servers = AgentConfig.get_mcp_servers()
+            enabled_count = sum(1 for s in servers.values() if not s.get('disabled', False))
+            result += f"• Total MCP Servers: {len(servers)}\n"
+            result += f"• Enabled Servers: {enabled_count}\n"
+        
+        if aws_mcp_manager:
+            aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
+            result += f"• AWS MCP Tools Available: {aws_tools_count}\n"
+        
+        return result
+    
+    elif action == "aws_status":
+        if not aws_mcp_manager:
+            return "❌ AWS MCP integration is not active"
+        
+        aws_tools = aws_mcp_manager.get_all_aws_tools()
+        active_clients = len(aws_mcp_manager.mcp_clients)
+        
+        result = f"🔧 **AWS MCP Integration Status:**\n\n"
+        result += f"• Status: 🟢 Active\n"
+        result += f"• Active Clients: {active_clients}\n"
+        result += f"• Available Tools: {len(aws_tools)}\n"
+        result += f"• Config Path: {AgentConfig.AWS_MCP_CONFIG_PATH}\n\n"
+        
+        if active_clients > 0:
+            result += "**Active Servers:**\n"
+            for server_name in aws_mcp_manager.mcp_clients.keys():
+                clean_name = server_name.replace('awslabs.', '').replace('-mcp-server', '')
+                server_tools = [t for t in aws_tools if getattr(t, '_server_name', '') == server_name]
+                result += f"• {clean_name}: {len(server_tools)} tools\n"
+        
+        return result
+    
+    elif action == "enable":
+        AgentConfig.toggle_mcp_config(True)
+        return "✅ MCP configuration loading enabled"
+    
+    elif action == "disable":
+        AgentConfig.toggle_mcp_config(False)
+        return "❌ MCP configuration loading disabled"
+    
+    elif action == "list_servers":
+        if not AgentConfig.ENABLE_MCP_CONFIG:
+            return "❌ MCP configuration loading is disabled. Enable it first with action='enable'"
+        
+        servers = AgentConfig.get_mcp_servers()
+        if not servers:
+            return "ℹ️  No MCP servers found in configuration"
+        
+        result = f"🔧 **MCP Servers ({len(servers)} total):**\n\n"
+        for name, config in servers.items():
+            status = "🟢 Enabled" if not config.get('disabled', False) else "🔴 Disabled"
+            command = config.get('command', 'Unknown')
+            args = config.get('args', [])
+            result += f"• **{name}**: {status}\n"
+            result += f"  Command: {command} {' '.join(args)}\n\n"
+        
+        return result
+    
+    elif action == "server_status":
+        if not server_name:
+            return "❌ server_name parameter required for server_status action"
+        
+        if not AgentConfig.ENABLE_MCP_CONFIG:
+            return "❌ MCP configuration loading is disabled"
+        
+        servers = AgentConfig.get_mcp_servers()
+        if server_name not in servers:
+            return f"❌ Server '{server_name}' not found in configuration"
+        
+        server_config = servers[server_name]
+        enabled = not server_config.get('disabled', False)
+        
+        result = f"🔧 **MCP Server: {server_name}**\n\n"
+        result += f"• Status: {'🟢 Enabled' if enabled else '🔴 Disabled'}\n"
+        result += f"• Command: {server_config.get('command', 'Unknown')}\n"
+        result += f"• Args: {' '.join(server_config.get('args', []))}\n"
+        
+        env_vars = server_config.get('env', {})
+        if env_vars:
+            result += f"• Environment Variables:\n"
+            for key, value in env_vars.items():
+                result += f"  - {key}: {value}\n"
+        
+        auto_approve = server_config.get('autoApprove', [])
+        if auto_approve:
+            result += f"• Auto-approved Tools: {', '.join(auto_approve)}\n"
+        
+        return result
+    
+    else:
+        return f"❌ Unknown action: {action}. Available actions: status, enable, disable, list_servers, server_status, aws_status"
+
+@tool
+def list_mcp_tools() -> str:
+    """List all available AgentCore Gateway MCP tools and their descriptions.
+    
+    Returns:
+        Formatted list of AgentCore Gateway MCP tools with descriptions
     """
     if not mcp_client:
-        return "❌ MCP client is not available. No MCP tools are currently accessible."
+        return "❌ AgentCore Gateway MCP client is not available. No gateway MCP tools are currently accessible."
     
     try:
         mcp_tools = get_full_tools_list(mcp_client)
         
         if not mcp_tools:
-            return "ℹ️  No MCP tools are currently available through the gateway."
+            return "ℹ️  No AgentCore Gateway MCP tools are currently available."
         
-        result = f"🔧 **Available MCP Tools ({len(mcp_tools)} total):**\n\n"
+        result = f"🔧 **Available AgentCore Gateway MCP Tools ({len(mcp_tools)} total):**\n\n"
         
         for i, tool in enumerate(mcp_tools, 1):
             tool_name = getattr(tool, 'name', 'Unknown')
@@ -816,11 +983,316 @@ def list_mcp_tools() -> str:
             result += f"{i}. **{tool_name}**{parameters}\n"
             result += f"   {tool_description}\n\n"
         
-        result += "💡 These tools are available through the MCP gateway integration and can be used for advanced functionality."
+        result += "💡 These tools are available through the AgentCore Gateway integration."
         return result
         
     except Exception as e:
-        return f"❌ Error retrieving MCP tools: {str(e)}"
+        return f"❌ Error retrieving AgentCore Gateway MCP tools: {str(e)}"
+
+@tool
+def list_aws_mcp_tools() -> str:
+    """List all available AWS MCP tools and their descriptions.
+    
+    Returns:
+        Formatted list of AWS MCP tools with descriptions
+    """
+    if not aws_mcp_manager:
+        return "❌ AWS MCP manager is not available. No AWS MCP tools are currently accessible."
+    
+    try:
+        aws_tools = aws_mcp_manager.get_all_aws_tools()
+        
+        if not aws_tools:
+            return "ℹ️  No AWS MCP tools are currently available."
+        
+        result = f"🔧 **Available AWS MCP Tools ({len(aws_tools)} total):**\n\n"
+        
+        # Group tools by server
+        tools_by_server = {}
+        for tool in aws_tools:
+            server_name = getattr(tool, '_server_name', 'Unknown')
+            if server_name not in tools_by_server:
+                tools_by_server[server_name] = []
+            tools_by_server[server_name].append(tool)
+        
+        for server_name, tools in tools_by_server.items():
+            clean_server_name = server_name.replace('awslabs.', '').replace('-mcp-server', '')
+            result += f"**{clean_server_name.upper()} ({len(tools)} tools):**\n"
+            
+            for i, tool in enumerate(tools, 1):
+                tool_name = getattr(tool, 'name', 'Unknown')
+                tool_description = getattr(tool, 'description', 'No description available')
+                
+                # Truncate long descriptions
+                if len(tool_description) > 100:
+                    tool_description = tool_description[:97] + "..."
+                
+                result += f"{i:2d}. {tool_name}\n"
+                result += f"    {tool_description}\n"
+            
+            result += "\n"
+        
+        result += "💡 These tools are available through AWS MCP integration and provide direct access to AWS services."
+        return result
+        
+    except Exception as e:
+        return f"❌ Error retrieving AWS MCP tools: {str(e)}"
+
+@tool
+def list_mcp_servers_from_config() -> str:
+    """List all MCP servers loaded from the configuration file with their details.
+    
+    Returns:
+        Comprehensive list of all MCP servers from the config file
+    """
+    if not AgentConfig.ENABLE_MCP_CONFIG:
+        return "❌ MCP configuration loading is disabled. Use manage_mcp_config(action='enable') to enable it."
+    
+    servers = AgentConfig.get_mcp_servers()
+    if not servers:
+        return "ℹ️  No MCP servers found in configuration file."
+    
+    result = f"📋 **All MCP Servers from Configuration ({len(servers)} total):**\n\n"
+    
+    enabled_count = 0
+    disabled_count = 0
+    
+    for name, config in servers.items():
+        is_enabled = not config.get('disabled', False)
+        status_icon = "🟢" if is_enabled else "🔴"
+        status_text = "Enabled" if is_enabled else "Disabled"
+        
+        if is_enabled:
+            enabled_count += 1
+        else:
+            disabled_count += 1
+        
+        result += f"{status_icon} **{name}** ({status_text})\n"
+        result += f"   Command: `{config.get('command', 'Unknown')}`\n"
+        
+        args = config.get('args', [])
+        if args:
+            args_str = ' '.join(args)
+            # Truncate very long args for readability
+            if len(args_str) > 80:
+                args_str = args_str[:77] + "..."
+            result += f"   Args: {args_str}\n"
+        
+        env_vars = config.get('env', {})
+        if env_vars:
+            env_list = [f"{k}={v}" for k, v in env_vars.items()]
+            env_str = ', '.join(env_list)
+            if len(env_str) > 60:
+                env_str = env_str[:57] + "..."
+            result += f"   Environment: {env_str}\n"
+        
+        auto_approve = config.get('autoApprove', [])
+        if auto_approve:
+            auto_str = ', '.join(auto_approve[:3])
+            if len(auto_approve) > 3:
+                auto_str += f" (+{len(auto_approve)-3} more)"
+            result += f"   Auto-approved: {auto_str}\n"
+        
+        result += "\n"
+    
+    # Summary
+    result += f"📊 **Summary:**\n"
+    result += f"• Total Servers: {len(servers)}\n"
+    result += f"• Enabled: {enabled_count}\n"
+    result += f"• Disabled: {disabled_count}\n"
+    
+    return result
+
+@tool
+def show_available_mcp_servers() -> str:
+    """Show all MCP servers available from the loaded configuration file.
+    
+    Returns:
+        Detailed list of MCP servers from the configuration file
+    """
+    if not AgentConfig.ENABLE_MCP_CONFIG:
+        return "❌ MCP configuration loading is disabled. Use manage_mcp_config(action='enable') to enable it."
+    
+    servers = AgentConfig.get_mcp_servers()
+    if not servers:
+        return "ℹ️  No MCP servers found in configuration file."
+    
+    result = f"🔧 **MCP Servers from Configuration File ({len(servers)} total):**\n\n"
+    result += f"📁 **Config Path:** {AgentConfig.MCP_CONFIG_PATH}\n\n"
+    
+    enabled_servers = []
+    disabled_servers = []
+    
+    for name, config in servers.items():
+        server_info = {
+            'name': name,
+            'command': config.get('command', 'Unknown'),
+            'args': config.get('args', []),
+            'env': config.get('env', {}),
+            'disabled': config.get('disabled', False),
+            'autoApprove': config.get('autoApprove', [])
+        }
+        
+        if server_info['disabled']:
+            disabled_servers.append(server_info)
+        else:
+            enabled_servers.append(server_info)
+    
+    # Show enabled servers first
+    if enabled_servers:
+        result += f"🟢 **Enabled Servers ({len(enabled_servers)}):**\n\n"
+        for server in enabled_servers:
+            result += f"• **{server['name']}**\n"
+            result += f"  Command: `{server['command']} {' '.join(server['args'])}`\n"
+            
+            if server['env']:
+                env_summary = ', '.join([f"{k}={v}" for k, v in list(server['env'].items())[:2]])
+                if len(server['env']) > 2:
+                    env_summary += f" (+{len(server['env'])-2} more)"
+                result += f"  Environment: {env_summary}\n"
+            
+            if server['autoApprove']:
+                auto_approve_summary = ', '.join(server['autoApprove'][:3])
+                if len(server['autoApprove']) > 3:
+                    auto_approve_summary += f" (+{len(server['autoApprove'])-3} more)"
+                result += f"  Auto-approved: {auto_approve_summary}\n"
+            
+            result += "\n"
+    
+    # Show disabled servers
+    if disabled_servers:
+        result += f"🔴 **Disabled Servers ({len(disabled_servers)}):**\n\n"
+        for server in disabled_servers:
+            result += f"• **{server['name']}** (disabled)\n"
+            result += f"  Command: `{server['command']} {' '.join(server['args'])}`\n\n"
+    
+    result += f"💡 Use `manage_mcp_config(action='server_status', server_name='<name>')` for detailed server info."
+    return result
+
+@tool
+def list_eks_clusters() -> str:
+    """List all EKS clusters in the current AWS account and region.
+    
+    Returns:
+        str: A formatted list of EKS clusters with their status and versions
+    """
+    try:
+        import boto3
+        
+        # Use the configured region
+        eks_client = boto3.client('eks', region_name=REGION)
+        
+        # List clusters
+        response = eks_client.list_clusters()
+        clusters = response.get('clusters', [])
+        
+        if not clusters:
+            return "No EKS clusters found in the current region."
+        
+        result = f"Found {len(clusters)} EKS clusters in region {REGION}:\n\n"
+        
+        # Get details for each cluster
+        for cluster_name in clusters:
+            try:
+                cluster_info = eks_client.describe_cluster(name=cluster_name)
+                cluster = cluster_info['cluster']
+                
+                status = cluster.get('status', 'Unknown')
+                version = cluster.get('version', 'Unknown')
+                created = cluster.get('createdAt', 'Unknown')
+                endpoint = cluster.get('endpoint', 'N/A')
+                
+                result += f"• {cluster_name}\n"
+                result += f"  Status: {status}\n"
+                result += f"  Version: {version}\n"
+                result += f"  Created: {created}\n"
+                result += f"  Endpoint: {endpoint}\n\n"
+                
+            except Exception as e:
+                result += f"• {cluster_name}\n"
+                result += f"  Error getting details: {str(e)}\n\n"
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error listing EKS clusters: {e}")
+        return f"Error listing EKS clusters: {str(e)}"
+
+@tool
+def aws_resource_guidance() -> str:
+    """Get guidance on which tools to use for different AWS resource operations.
+    
+    This tool provides guidance on choosing the correct MCP tools for AWS operations.
+    Use this when you need to understand which tool to use for specific AWS tasks.
+    
+    Returns:
+        str: Detailed guidance on AWS tool usage
+    """
+    guidance = """🔧 **AWS Resource Tool Usage Guide**
+
+**For EKS Cluster Operations:**
+
+1. **List EKS Clusters** (AWS Account Level):
+   ✅ USE: `list_eks_clusters()` - Lists all EKS clusters in your account
+   ✅ USE: `list_resources` (CCAPI) with resource_type="AWS::EKS::Cluster"
+   ❌ DON'T USE: `list_k8s_resources` (EKS MCP) - This is for resources WITHIN clusters
+
+2. **Manage Kubernetes Resources** (Within a Cluster):
+   ✅ USE: `list_k8s_resources` (EKS MCP) - Lists pods, services, etc. within a specific cluster
+   ✅ USE: `get_k8s_events` (EKS MCP) - Gets events for specific resources
+   ✅ USE: `get_pod_logs` (EKS MCP) - Gets logs from pods
+
+**For Other AWS Resources:**
+
+3. **List AWS Resources** (Account Level):
+   ✅ USE: `list_resources` (CCAPI) - Lists any AWS resource type (S3, RDS, etc.)
+   ✅ USE: `get_resource` (CCAPI) - Gets details of specific resources
+
+4. **CloudWatch Operations:**
+   ✅ USE: CloudWatch MCP tools for metrics, logs, and alarms
+
+**Key Rule:**
+- EKS MCP tools work WITHIN clusters (need cluster_name parameter)
+- CCAPI/Core MCP tools work at AWS account level (list clusters, buckets, etc.)
+"""
+    return guidance
+
+@tool
+def eks_tool_guidance() -> str:
+    """Get specific guidance for EKS-related operations and tool selection.
+    
+    Use this tool when you need to understand which EKS tools to use for specific tasks.
+    
+    Returns:
+        str: Detailed EKS tool usage guidance
+    """
+    guidance = """🚀 **EKS Tool Selection Guide**
+
+**IMPORTANT: Choose the RIGHT tool for your EKS task!**
+
+**❓ User asks: "List all my EKS clusters"**
+✅ CORRECT: Use `list_eks_clusters()` or `list_resources` with resource_type="AWS::EKS::Cluster"
+❌ WRONG: Don't use `list_k8s_resources` - this needs a cluster name!
+
+**❓ User asks: "List pods in my cluster"**
+✅ CORRECT: Use `list_k8s_resources` with cluster_name="your-cluster" and kind="Pod"
+❌ WRONG: Don't use `list_eks_clusters()` - this only lists clusters, not pods
+
+**❓ User asks: "Show me cluster details"**
+✅ CORRECT: Use `get_resource` with resource_type="AWS::EKS::Cluster" and identifier="cluster-name"
+✅ ALSO CORRECT: Use `list_eks_clusters()` for basic info
+
+**❓ User asks: "Get pod logs"**
+✅ CORRECT: Use `get_pod_logs` with cluster_name, namespace, and pod_name
+
+**Tool Categories:**
+1. **Cluster Management** (AWS Level): list_eks_clusters, get_resource, create_resource
+2. **Kubernetes Resources** (Within Cluster): list_k8s_resources, get_k8s_events, get_pod_logs
+3. **Monitoring** (CloudWatch): get_cloudwatch_logs, get_cloudwatch_metrics
+
+**Remember:** EKS clusters are AWS resources. Pods/Services are Kubernetes resources within clusters.
+"""
+    return guidance
 
 @tool
 def websearch(
@@ -876,6 +1348,7 @@ def _format_search_results(results: list) -> str:
     return "\n".join(formatted)
 
 
+# Create a Bedrock model instance with temperature control
 # Model and memory initialization will be done in main()
 
 
@@ -975,16 +1448,16 @@ class MemoryManager:
         return [
             {
                 StrategyType.USER_PREFERENCE.value: {
-                    "name": "EKSPreferences",
-                    "description": "Captures EKS preferences and behavior",
-                    "namespaces": ["agent/eks/{actorId}/preferences"],
+                    "name": "DevOpsPreferences",
+                    "description": "Captures DevOps preferences and behavior",
+                    "namespaces": ["agent/devops/{actorId}/preferences"],
                 }
             },
             {
                 StrategyType.SEMANTIC.value: {
-                    "name": "EKSAgentSemantic",
+                    "name": "DevOpsAgentSemantic",
                     "description": "Stores facts from conversations",
-                    "namespaces": ["agent/eks/{actorId}/semantic"],
+                    "namespaces": ["agent/devops/{actorId}/semantic"],
                 }
             },
         ]
@@ -997,16 +1470,15 @@ class MemoryManager:
         except Exception as e:
             logger.warning(f"Could not save memory ID to SSM: {e}")
 
-def create_or_get_memory_resource(client: MemoryClient, memory_name: str):
+def create_or_get_memory_resource():
     """Factory function for memory resource creation."""
-    memory_manager = MemoryManager(client, memory_name)
+    memory_manager = MemoryManager(memory_client, AgentConfig.MEMORY_NAME)
     return memory_manager.get_or_create_memory()
 
-def initialize_memory(client: MemoryClient) -> str | None:
+def initialize_memory() -> str | None:
     """Initialize memory with proper error handling."""
     try:
-        memory_name = AgentConfig.MEMORY_NAME
-        memory_id = create_or_get_memory_resource(client, memory_name)
+        memory_id = create_or_get_memory_resource()
         if memory_id:
             logger.info(f"AgentCore Memory ready with ID: {memory_id}")
             return memory_id
@@ -1032,7 +1504,7 @@ def _log_memory_initialization_error():
     for msg in error_messages:
         logger.warning(msg)
 
-# Memory initialization will be done in main()
+# Memory ID initialization will be done in main()
 
 class EKSAgentMemoryHooks(HookProvider):
     """Memory hooks for EKS Agent"""
@@ -1113,7 +1585,7 @@ class EKSAgentMemoryHooks(HookProvider):
                         break
 
                 if user_query and agent_response:
-                    # *** AGENTCORE MEMORY USAGE *** - Save the EKS interaction
+                    # *** AGENTCORE MEMORY USAGE *** - Save the DevOps interaction
                     # Note: AgentCore Memory requires "ASSISTANT" role, not "AGENT"
                     self.client.create_event(
                         memory_id=self.memory_id,
@@ -1124,10 +1596,10 @@ class EKSAgentMemoryHooks(HookProvider):
                             (agent_response, "ASSISTANT"),
                         ],
                     )
-                    logger.info("Saved EKS interaction to memory")
+                    logger.info("Saved DevOps interaction to memory")
 
         except Exception as e:
-            logger.error(f"Failed to save EKS interaction: {e}")
+            logger.error(f"Failed to save DevOps interaction: {e}")
 
     def register_hooks(self, registry: HookRegistry) -> None:
         """Register EKS Agent memory hooks"""
@@ -1137,7 +1609,18 @@ class EKSAgentMemoryHooks(HookProvider):
 
 SESSION_ID = str(uuid.uuid4())
 
-
+def create_agent_hooks(memory_id: str | None) -> list:
+    """Create agent hooks based on memory availability."""
+    if not memory_id:
+        logger.info("Running without memory functionality")
+        return []
+    
+    session_id = str(uuid.uuid4())
+    memory_hooks = EKSAgentMemoryHooks(
+        memory_id, memory_client, AgentConfig.DEVOPS_USER_ID, session_id
+    )
+    logger.info("Memory hooks enabled")
+    return [memory_hooks]
 
 def get_full_tools_list(client):
     """
@@ -1177,25 +1660,57 @@ def get_full_tools_list(client):
         return tools
         
     except Exception as e:
-        print(f"⚠️  Error in get_full_tools_list: {e}")
         # Fallback to simple list_tools_sync
         try:
             simple_tools = client.list_tools_sync()
-            return simple_tools if hasattr(simple_tools, '__iter__') else [simple_tools] if simple_tools else []
+            
+            # Handle different response formats
+            if isinstance(simple_tools, dict):
+                if 'tools' in simple_tools and simple_tools['tools']:
+                    return simple_tools['tools']
+                else:
+                    print("ℹ️  MCP client returned empty tools dict - no tools available")
+                    return []
+            elif isinstance(simple_tools, list):
+                return simple_tools
+            elif simple_tools is None:
+                print("ℹ️  MCP client returned None - no tools available")
+                return []
+            else:
+                return [simple_tools] if simple_tools else []
+                
         except Exception as fallback_error:
-            print(f"⚠️  Fallback also failed: {fallback_error}")
+            # Check for common MCP errors and provide cleaner messages
+            error_str = str(fallback_error).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print("ℹ️  No MCP tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print("ℹ️  MCP server connection unavailable")
+            else:
+                print("ℹ️  MCP tools unavailable")
             return []
 
 def create_tools_list():
     """Create the list of tools for the agent."""
-    tools_list = [websearch, list_mcp_tools]
+    tools_list = [
+        websearch, 
+        list_mcp_tools, 
+        list_aws_mcp_tools,
+        list_mcp_server_names,
+        manage_mcp_config,
+        list_mcp_servers_from_config,
+        show_available_mcp_servers,
+        list_eks_clusters,
+        aws_resource_guidance,
+        eks_tool_guidance
+    ]
     
-    # Add MCP tools if available
+    # Add AgentCore Gateway MCP tools if available
     if mcp_client:
         try:
             mcp_tools = get_full_tools_list(mcp_client)
             tools_list.extend(mcp_tools)
-            print(f"✅ Added {len(mcp_tools)} MCP tools (with pagination support)")
+            print(f"✅ Added {len(mcp_tools)} AgentCore Gateway MCP tools")
         except Exception as e:
             # Check for common MCP errors and provide cleaner messages
             error_str = str(e).lower()
@@ -1206,101 +1721,27 @@ def create_tools_list():
             else:
                 print("ℹ️  MCP tools unavailable")
     
-    return tools_list
-
-def get_full_tools_list(mcp_client):
-    """Get all available tools from MCP client."""
-    try:
-        if mcp_client:
-            tools_result = mcp_client.list_tools_sync()
-            # Handle different response formats
-            if isinstance(tools_result, dict):
-                # If it's a dict, look for 'tools' key
-                if 'tools' in tools_result and tools_result['tools']:
-                    return tools_result['tools']
-                else:
-                    print("ℹ️  MCP client returned empty tools dict - no tools available")
-                    return []
-            elif isinstance(tools_result, list):
-                # If it's already a list, return it
-                return tools_result
-            elif tools_result is None:
-                print("ℹ️  MCP client returned None - no tools available")
-                return []
-            else:
-                print(f"⚠️  Unexpected MCP tools format: {type(tools_result)}")
-                return []
-        else:
-            print("ℹ️  No MCP client available")
-            return []
-    except Exception as e:
-        # Check for common MCP errors and provide cleaner messages
-        error_str = str(e).lower()
-        if "validation error" in error_str and "tools" in error_str:
-            print("ℹ️  No MCP tools available")
-        elif "connection" in error_str or "timeout" in error_str:
-            print("ℹ️  MCP server connection unavailable")
-        else:
-            print("ℹ️  MCP tools unavailable")
-        return []
-
-def create_tools_list():
-    """Create the complete list of tools for the agent."""
-    # Start with local tools
-    tools_list = [
-        websearch,
-        list_mcp_tools,
-    ]
-    
-    # Add MCP tools if available
-    if mcp_client:
-        try:
-            mcp_tools = get_full_tools_list(mcp_client)
-            if mcp_tools:
-                tools_list.extend(mcp_tools)
-                print(f"✅ Added {len(mcp_tools)} MCP tools to agent")
-            else:
-                print("ℹ️  No MCP tools available")
-        except Exception as e:
-            print(f"⚠️  Could not add MCP tools: {e}")
-    
     # Add AWS MCP tools if available
     if aws_mcp_manager:
         try:
             aws_tools = aws_mcp_manager.get_all_aws_tools()
-            if aws_tools:
-                tools_list.extend(aws_tools)
-                print(f"✅ Added {len(aws_tools)} AWS MCP tools to agent")
-            else:
-                print("ℹ️  No AWS MCP tools available")
+            tools_list.extend(aws_tools)
+            print(f"✅ Added {len(aws_tools)} AWS MCP tools")
         except Exception as e:
-            print(f"⚠️  Could not add AWS MCP tools: {e}")
+            # Check for common MCP errors and provide cleaner messages
+            error_str = str(e).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print("ℹ️  No AWS MCP tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print("ℹ️  AWS MCP server connection unavailable")
+            else:
+                print("ℹ️  AWS MCP tools unavailable")
     
-    print(f"🔧 Total tools available: {len(tools_list)}")
     return tools_list
 
-def create_agent_hooks(memory_id: str | None, client: MemoryClient | None):
-    """Create agent hooks for memory integration."""
-    if memory_id and client:
-        try:
-            hooks = EKSAgentMemoryHooks(
-                memory_id=memory_id,
-                client=client,
-                actor_id=AgentConfig.DEVOPS_USER_ID,
-                session_id=str(uuid.uuid4())
-            )
-            print("✅ Memory hooks created successfully")
-            return [hooks]  # Return as list for Agent constructor
-        except Exception as e:
-            print(f"⚠️  Could not create memory hooks: {e}")
-            return []
-    else:
-        print("ℹ️  Memory not available - hooks disabled")
-        return []
-
-def create_eks_agent(model_id: str) -> Agent:
+def create_devops_agent(model_id: str) -> Agent:
     """Create and configure the EKS agent."""
-    hooks = create_agent_hooks(memory_id, memory_client)
+    hooks = create_agent_hooks(memory_id)
     
     # Create model with the provided model_id
     model = BedrockModel(
@@ -1326,7 +1767,7 @@ CRITICAL TOOL SELECTION RULES:
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools
 - Use tools ONLY when you need current/specific data
-- MAXIMUM 3 tool call per response
+- MAXIMUM 1 tool call per response
 - Keep responses under 300 words
 - Be direct and actionable
 
@@ -1346,9 +1787,71 @@ class ConversationManager:
         self.bot_name = bot_name
         self.exit_commands = {'exit', 'quit', 'bye'}
     
+    def _list_all_mcp_tools(self) -> str:
+        """List all MCP tools loaded from the configuration file."""
+        if not AgentConfig.ENABLE_MCP_CONFIG:
+            return "❌ MCP configuration disabled"
+        
+        servers = AgentConfig.get_mcp_servers()
+        if not servers:
+            return "ℹ️  No MCP servers found"
+        
+        enabled_servers = []
+        disabled_servers = []
+        
+        for name, config in servers.items():
+            # Extract clean server name
+            clean_name = name.replace('awslabs.', '').replace('-mcp-server', '').replace('-mcp', '')
+            
+            if config.get('disabled', False):
+                disabled_servers.append(clean_name)
+            else:
+                enabled_servers.append(clean_name)
+        
+        result = f"🔧 **MCP Tools ({len(enabled_servers)} enabled):**\n"
+        
+        # Show enabled servers in a compact list
+        for i, name in enumerate(enabled_servers, 1):
+            result += f"{i:2d}. {name}\n"
+        
+        if disabled_servers:
+            result += f"\n🔴 **Disabled ({len(disabled_servers)}):** {', '.join(disabled_servers)}"
+        
+        return result
+    
+    def _show_help(self) -> str:
+        """Show available commands and help information."""
+        help_text = "🔧 **Available Commands:**\n\n"
+        help_text += "**Special Commands:**\n"
+        help_text += "• `/tool` or `/tools` - List all MCP tools from configuration\n"
+        help_text += "• `/help` or `/h` - Show this help message\n"
+        help_text += "• `exit`, `quit`, `bye` - Exit the agent\n\n"
+        
+        help_text += "**MCP Management Tools:**\n"
+        help_text += "• `list_mcp_server_names()` - Quick list of server names\n"
+        help_text += "• `list_mcp_servers_from_config()` - Detailed server info\n"
+        help_text += "• `manage_mcp_config()` - Manage MCP configuration\n"
+        help_text += "• `show_available_mcp_servers()` - Show servers with details\n\n"
+        
+        help_text += "**MCP Tools:**\n"
+        help_text += "• `list_mcp_tools()` - List AgentCore Gateway MCP tools\n"
+        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (AWS services)\n\n"
+        
+        help_text += "**Other Tools:**\n"
+        help_text += "• `websearch()` - Search the web for information\n\n"
+        
+        help_text += "💡 **Tips:**\n"
+        help_text += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'}\n"
+        help_text += f"• AWS MCP Integration: {'🟢 Enabled' if aws_mcp_manager else '🔴 Disabled'}\n"
+        help_text += f"• Available MCP Servers: {len(AgentConfig.get_mcp_servers())}\n"
+        help_text += "• Ask me anything about EKS, Kubernetes, or AWS!"
+        
+        return help_text
+    
     def start_conversation(self):
         """Start the interactive conversation loop."""
-        print(f"\n🚀 {self.bot_name}: Ask me about EKS on AWS! Type 'exit' to quit.\n")
+        print(f"\n🚀 {self.bot_name}: Ask me about EKS on AWS! Type 'exit' to quit.")
+        print(f"💡 Special commands: /tool or /tools (list MCP tools), /help (show commands)\n")
         
         try:
             while True:
@@ -1356,19 +1859,31 @@ class ConversationManager:
                     user_input = input("\nYou > ").strip()
                     
                     if user_input.lower() in self.exit_commands:
-                        print("Happy EKSing!")
-                        break
+                        print("👋 Goodbye!")
+                        # Cleanup will be handled by the main function's finally block
+                        return  # Return instead of break to exit the function
                         
                     if not user_input:
                         print(f"\n{self.bot_name} > Please ask me something about EKS on AWS!")
+                        continue
+                    
+                    # Handle special commands
+                    if user_input.lower() in ["/tool", "/tools"]:
+                        tool_list = self._list_all_mcp_tools()
+                        print(f"\n{self.bot_name} > {tool_list}")
+                        continue
+                    elif user_input.lower() in ["/help", "/h"]:
+                        help_text = self._show_help()
+                        print(f"\n{self.bot_name} > {help_text}")
                         continue
                     
                     response = self.agent(user_input)
                     # strands handles the response automatically, no need to print manually
                     
                 except KeyboardInterrupt:
-                    print("\n\nGoodbye! Happy EKSing!")
-                    break
+                    print("\n\n👋 Goodbye!")
+                    # Cleanup will be handled by the main function's finally block
+                    return  # Return instead of break to exit the function
                 except Exception as e:
                     logger.error(f"Error processing user input: {e}")
                     print(f"\n{self.bot_name} > Sorry, I encountered an error: {e}")
@@ -1376,6 +1891,7 @@ class ConversationManager:
         except Exception as e:
             logger.error(f"Fatal error in conversation loop: {e}")
             print(f"Fatal error: {e}")
+            # Cleanup will be handled by the main function's finally block
 
 def setup_gateway_parameters():
     """Interactive setup for gateway SSM parameters."""
@@ -1430,6 +1946,8 @@ def setup_gateway_parameters():
     
     print(f"\n🚀 Agent Status:")
     print(f"   The agent works with full functionality including gateway support!")
+
+
 
 def initialize_agent():
     """Initialize all agent components."""
@@ -1507,25 +2025,63 @@ def initialize_agent():
             print("🔄 Continuing without MCP client functionality...")
             mcp_client = None
 
-    # Initialize AWS MCP Manager if enabled
+    # Initialize AWS MCP Manager with timeout
     aws_mcp_manager = None
-    if AgentConfig.ENABLE_AWS_MCP and AgentConfig.AWS_MCP_CONFIG_PATH:
-        try:
-            print("🔧 Initializing AWS MCP Manager...")
-            aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
-            aws_mcp_manager.initialize_aws_mcp_clients()
-        except Exception as e:
-            print(f"⚠️  AWS MCP Manager initialization failed: {e}")
+    if AgentConfig.ENABLE_AWS_MCP:
+        import threading
+        import time
+        
+        def init_aws_mcp():
+            """Initialize AWS MCP Manager."""
+            global aws_mcp_manager
+            try:
+                print("🔧 Initializing AWS MCP integration...")
+                
+                # Verify AWS region is properly configured before MCP initialization
+                current_region = os.environ.get('AWS_DEFAULT_REGION', 'not-set')
+                print(f"   • AWS region: {current_region}")
+                
+                # Verify AWS credentials are available
+                try:
+                    session = Session()
+                    credentials = session.get_credentials()
+                    if credentials is None:
+                        raise Exception("No AWS credentials found")
+                    print(f"   • AWS credentials: ✅ Available")
+                except Exception as cred_error:
+                    print(f"   • AWS credentials: ❌ {cred_error}")
+                    raise Exception(f"AWS credentials not available: {cred_error}")
+                
+                aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
+                aws_mcp_manager.initialize_aws_mcp_clients()
+                aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
+                print(f"✅ AWS MCP integration ready with {aws_tools_count} tools")
+            except Exception as e:
+                print(f"⚠️  AWS MCP initialization failed: {e}")
+                print("🔄 Continuing without AWS MCP functionality...")
+                aws_mcp_manager = None
+        
+        # Run AWS MCP initialization with timeout
+        init_thread = threading.Thread(target=init_aws_mcp, daemon=True)
+        init_thread.start()
+        init_thread.join(timeout=15.0)  # 15 second timeout
+        
+        if init_thread.is_alive():
+            print("⚠️  AWS MCP initialization timed out after 15s, continuing without it...")
             aws_mcp_manager = None
-
-    # Initialize memory
-    memory_client = MemoryClient(region_name=REGION)
-    memory_id = initialize_memory(memory_client)
+    else:
+        print("ℹ️  AWS MCP integration disabled")
     
-    # Return the current model ID for agent creation
+    # Initialize model
     current_model_id = AgentConfig.get_model_id()
     print(f"🤖 Using MODEL_ID: {current_model_id}")
     print(f"📝 Model Description: {AgentConfig.list_models()[AgentConfig.SELECTED_MODEL]}")
+    
+    # Initialize memory
+    global memory_client, memory_id
+    memory_client = MemoryClient(region_name=REGION)
+    memory_id = initialize_memory()
+    
     return current_model_id
 
 def main():
@@ -1555,7 +2111,7 @@ def main():
         current_model_id = initialize_agent()
         
         # Create agent with initialized components
-        agent = create_eks_agent(current_model_id)
+        agent = create_devops_agent(current_model_id)
         conversation_manager = ConversationManager(agent)
         conversation_manager.start_conversation()
         

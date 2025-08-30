@@ -1767,7 +1767,7 @@ CRITICAL TOOL SELECTION RULES:
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools
 - Use tools ONLY when you need current/specific data
-- MAXIMUM 3 tool call per response
+- MAXIMUM 1 tool call per response
 - Keep responses under 300 words
 - Be direct and actionable
 

@@ -1367,12 +1367,15 @@ class MemoryManager:
         # Try SSM first, then search, then create
         memory_id = self._get_memory_from_ssm()
         if memory_id:
+            logger.info("Using memory ID from SSM")
             return memory_id
             
         memory_id = self._find_existing_memory()
         if memory_id:
+            logger.info("Using found existing memory")
             return memory_id
             
+        logger.info("No existing memory found, attempting to create new one")
         return self._create_new_memory()
     
     def _get_memory_from_ssm(self) -> str | None:
@@ -1440,8 +1443,15 @@ class MemoryManager:
             self._save_memory_id_to_ssm(memory_id)
             return memory_id
         except Exception as e:
-            logger.error(f"Failed to create memory: {e}")
-            return None
+            error_str = str(e)
+            # Check if memory already exists
+            if "already exists" in error_str.lower() or "validation" in error_str.lower():
+                logger.info(f"Memory with name '{self.memory_name}' already exists, attempting to find it...")
+                # Try to find the existing memory again with more thorough search
+                return self._find_existing_memory_by_name()
+            else:
+                logger.error(f"Failed to create memory: {e}")
+                return None
     
     def _create_memory_strategies(self) -> list:
         """Create memory strategies configuration."""
@@ -1462,6 +1472,35 @@ class MemoryManager:
             },
         ]
     
+    def _find_existing_memory_by_name(self) -> str | None:
+        """Find existing memory by exact name match."""
+        try:
+            logger.info(f"Searching for existing memory with name: {self.memory_name}")
+            memories = self.client.gmcp_client.list_memories()
+            
+            for memory in memories.get('memories', []):
+                memory_id = memory.get('id')
+                memory_name_from_api = memory.get('name')
+                memory_status = memory.get('status')
+                
+                logger.debug(f"Checking memory - ID: {memory_id}, Name: {memory_name_from_api}, Status: {memory_status}")
+                
+                # Skip memories that are being deleted
+                if memory_status == 'DELETING':
+                    continue
+                
+                # Exact name match
+                if memory_name_from_api == self.memory_name:
+                    logger.info(f"Found existing memory by name: {memory_id}")
+                    self._save_memory_id_to_ssm(memory_id)
+                    return memory_id
+            
+            logger.warning(f"No existing memory found with name: {self.memory_name}")
+            return None
+        except Exception as e:
+            logger.error(f"Error searching for existing memory: {e}")
+            return None
+
     def _save_memory_id_to_ssm(self, memory_id: str) -> None:
         """Save memory ID to SSM Parameter Store."""
         try:

@@ -13,9 +13,22 @@ from datetime import datetime
 # Import the BedrockAgentCoreApp wrapper
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
-# Import our existing agent components
+# Configure MCP settings before importing agent components
+# Disable MCP configuration for runtime to avoid initialization issues
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Import and configure AgentConfig first
+from agent import AgentConfig
+
+# Disable MCP configuration for runtime environment
+AgentConfig.ENABLE_MCP_CONFIG = False
+AgentConfig.ENABLE_AWS_MCP = False
+
+# Import agent module and initialization functions
+import agent
 from agent import (
-    model, memory_id, memory_client, mcp_client, 
     create_agent_hooks, create_tools_list, AgentConfig
 )
 from strands.agent import Agent
@@ -34,6 +47,9 @@ app = BedrockAgentCoreApp()
 def create_runtime_agent():
     """Create the agent instance for runtime deployment."""
     try:
+        # Initialize runtime components
+        model, memory_id, memory_client, mcp_client = agent.initialize_runtime_components()
+        
         # Create hooks (memory functionality)
         hooks = create_agent_hooks(memory_id)
         
@@ -41,83 +57,27 @@ def create_runtime_agent():
         tools = create_tools_list()
         
         # Create agent with existing configuration
-        agent = Agent(
+        runtime_agent = Agent(
             model=model,
             tools=tools,
             hooks=hooks,
-            system_prompt="""You are an EKS Agent, an expert AWS Kubernetes and container orchestration assistant. You help with:
-
-- Amazon EKS cluster management and configuration
-- Kubernetes workload deployment and scaling
-- Container security and best practices
-- EKS networking and service mesh (Istio, App Mesh)
-- Kubernetes troubleshooting and debugging
-- EKS add-ons and integrations (ALB Controller, EBS CSI, etc.)
-- CI/CD pipelines for containerized applications
-- Kubernetes monitoring and observability
-
-You have access to:
-- Web search for current information
-- Memory to remember user preferences and context
-- MCP tools for advanced integrations (if available)
-
-Provide practical, actionable advice with specific examples when possible.
-Focus on EKS best practices, security, and cost optimization for Kubernetes workloads."""
+            system_prompt=AgentConfig.EKS_SYSTEM_PROMPT
         )
         
         logger.info("Runtime agent created successfully")
         logger.info(f"Memory enabled: {memory_id is not None}")
         logger.info(f"MCP client enabled: {mcp_client is not None}")
         logger.info(f"Tools available: {len(tools)}")
+        logger.info(f"MCP Configuration disabled for runtime: ENABLE_MCP_CONFIG={AgentConfig.ENABLE_MCP_CONFIG}, ENABLE_AWS_MCP={AgentConfig.ENABLE_AWS_MCP}")
         
-        return agent
+        # Log available tool names for debugging
+        tool_names = [getattr(tool, 'name', str(tool)) for tool in tools]
+        logger.info(f"Available tools: {tool_names}")
+        
+        return runtime_agent
         
     except Exception as e:
         logger.error(f"Failed to create runtime agent: {e}")
-        raise
-
-def create_fresh_agent_instance():
-    """Create a fresh agent instance without persistent conversation history."""
-    try:
-        # Create full tools list including MCP tools (mandatory)
-        tools = create_tools_list()
-        
-        # Create agent WITHOUT memory hooks to avoid conversation history issues
-        agent = Agent(
-            model=model,
-            tools=tools,
-            hooks=[],  # No hooks to avoid memory-related message issues
-            system_prompt="""You are an EKS Agent, an expert AWS Kubernetes and container orchestration assistant. You help with:
-
-- Amazon EKS cluster management and configuration
-- Kubernetes workload deployment and scaling
-- Container security and best practices
-- EKS networking and service mesh (Istio, App Mesh)
-- Kubernetes troubleshooting and debugging
-- EKS add-ons and integrations (ALB Controller, EBS CSI, etc.)
-- CI/CD pipelines for containerized applications
-- Kubernetes monitoring and observability
-
-You have access to:
-- Web search for current information (use ONLY when specifically asked to search or for very recent updates)
-- MCP tools for advanced integrations (always available)
-
-IMPORTANT: Tool usage guidelines:
-1. Use web search ONLY when:
-   - User explicitly asks you to search for something
-   - User asks about very recent EKS/Kubernetes announcements or updates  
-   - User needs current pricing or availability information
-2. Use MCP tools when appropriate for advanced functionality
-3. For general EKS questions, greetings, or basic Kubernetes topics, use your existing knowledge without searching
-
-Provide practical, actionable advice with specific examples when possible.
-Focus on AWS best practices and cost-effective solutions."""
-        )
-        
-        return agent
-        
-    except Exception as e:
-        logger.error(f"Failed to create fresh agent instance: {e}")
         raise
 
 # Create the agent instance
@@ -165,11 +125,9 @@ def invoke(payload: Dict[str, Any]) -> Dict[str, Any]:
         
         logger.info(f"Processing request: {user_message[:100]}...")
         
-        # Process the message with the agent
+        # Process the message with the memory-enabled runtime agent
         try:
-            # Create a fresh agent instance for each request to avoid message history issues
-            fresh_agent = create_fresh_agent_instance()
-            response = fresh_agent(user_message)
+            response = runtime_agent(user_message)
             logger.info(f"Agent response type: {type(response)}")
             logger.info(f"Agent response: {str(response)[:200]}...")
         except Exception as agent_error:

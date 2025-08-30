@@ -49,8 +49,26 @@ python3 agent.py
 # Interactive model selection
 python3 agent.py --select-model
 
+# Runtime deployment
+python3 agent_runtime.py
+
 # Runtime invocation
 python3 invoke_runtime.py interactive
+```
+
+#### Agent Runtime Pattern
+All agents follow a standardized runtime architecture:
+
+```bash
+# Runtime deployment with standardized pattern
+cd eks-agentcore/
+python3 agent_runtime.py
+
+# Key runtime features:
+# - Memory mandatory for context retention
+# - MCP configuration automatically disabled
+# - System prompt constants (e.g., EKS_SYSTEM_PROMPT)
+# - Standardized initialization functions
 ```
 
 #### Testing
@@ -89,6 +107,46 @@ Each agent requires specific SSM parameters:
 - Default region: `us-east-1`
 - Requires appropriate IAM permissions for each agent's AWS services
 - Uses AWS CLI configuration or environment variables
+
+## Agent Runtime Architecture
+
+### Standardized Runtime Pattern
+All agents follow a consistent runtime deployment pattern:
+
+```python
+# Runtime configuration (in agent_runtime.py)
+# Configure MCP settings before importing agent components
+from agent import AgentConfig
+
+# Disable MCP configuration for runtime environment
+AgentConfig.ENABLE_MCP_CONFIG = False
+AgentConfig.ENABLE_AWS_MCP = False
+
+# Import agent module and initialization functions
+import agent
+from agent import create_agent_hooks, create_tools_list, AgentConfig
+
+def create_runtime_agent():
+    """Create the runtime agent with memory and tools."""
+    # Initialize runtime components
+    model, memory_id, memory_client, mcp_client = agent.initialize_runtime_components()
+    
+    # Create agent with system prompt constant
+    runtime_agent = Agent(
+        model=model,
+        tools=tools,
+        hooks=hooks,
+        system_prompt=AgentConfig.AGENT_SYSTEM_PROMPT  # Agent-specific constant
+    )
+    return runtime_agent
+```
+
+### Runtime Features
+- **Memory Mandatory**: All runtime agents use persistent memory
+- **MCP Configuration Disabled**: Prevents initialization conflicts
+- **System Prompt Constants**: Agent-specific prompts (EKS_SYSTEM_PROMPT, etc.)
+- **Initialization Functions**: Standardized component setup
+- **Error Handling**: Robust error recovery with graceful degradation
 
 ## Model Configuration
 

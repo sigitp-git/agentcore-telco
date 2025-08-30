@@ -2,10 +2,67 @@
 
 This document consolidates all agent-specific improvements, fixes, and technical details for the AWS AgentCore Telco project.
 
+## Latest Runtime Pattern (August 2025)
+
+### Standardized Agent Runtime Architecture
+
+All agents now follow a consistent runtime pattern for AgentCore deployment:
+
+#### Key Runtime Features
+- **Memory Mandatory**: All runtime agents use persistent memory for context retention
+- **MCP Configuration Disabled**: Runtime environment automatically disables MCP configuration to prevent initialization conflicts
+- **System Prompt Constants**: Each agent uses a dedicated system prompt constant stored in `AgentConfig`
+- **Initialization Functions**: Standardized component initialization with proper error handling
+- **Enhanced Error Handling**: Robust error recovery with graceful degradation
+
+#### Runtime Configuration Pattern
+```python
+# Configure MCP settings before importing agent components
+from agent import AgentConfig
+
+# Disable MCP configuration for runtime environment
+AgentConfig.ENABLE_MCP_CONFIG = False
+AgentConfig.ENABLE_AWS_MCP = False
+
+# Import agent module and initialization functions
+import agent
+from agent import create_agent_hooks, create_tools_list, AgentConfig
+
+def create_runtime_agent():
+    """Create the runtime agent with memory and tools."""
+    # Initialize runtime components
+    model, memory_id, memory_client, mcp_client = agent.initialize_runtime_components()
+    
+    # Create agent with system prompt constant
+    runtime_agent = Agent(
+        model=model,
+        tools=tools,
+        hooks=hooks,
+        system_prompt=AgentConfig.AGENT_SYSTEM_PROMPT  # Agent-specific constant
+    )
+    return runtime_agent
+```
+
+#### Standardized Initialization Functions
+
+All agents now include these standardized functions:
+
+1. **`initialize_runtime_components()`** - Main initialization function
+2. **`setup_gateway_and_mcp()`** - Gateway and MCP client setup
+3. **`setup_memory()`** - Memory client initialization
+
+#### System Prompt Constants
+
+Each agent has a dedicated system prompt constant:
+- **EKS Agent**: `AgentConfig.EKS_SYSTEM_PROMPT`
+- **VPC Agent**: `AgentConfig.VPC_SYSTEM_PROMPT`
+- **Outposts Agent**: `AgentConfig.OUTPOSTS_SYSTEM_PROMPT`
+- **Prometheus Agent**: `AgentConfig.PROMETHEUS_SYSTEM_PROMPT`
+
 ## EKS Agent Improvements
 
 ### Overview
-The EKS agent has been successfully upgraded to match the functionality of the Prometheus agent, incorporating advanced features for better MCP integration, resource management, and error handling.
+The EKS agent has been successfully upgraded with the latest runtime pattern and enhanced functionality for better MCP integration, resource management, and error handling.
 
 ### Key Improvements Added
 

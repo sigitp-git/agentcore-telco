@@ -412,13 +412,16 @@ cd prometheus-agentcore
 python3 agent.py
 ```
 
-### Using Runtime Invocation
+### Using Runtime Deployment
 
-For programmatic access, use the runtime invoker:
+For AgentCore Runtime deployment, each agent includes a standardized runtime wrapper:
 
 ```bash
-# Interactive mode
+# Deploy to AgentCore Runtime
 cd eks-agentcore
+python3 agent_runtime.py
+
+# Test runtime functionality
 python3 invoke_runtime.py interactive
 
 # Test mode
@@ -426,6 +429,35 @@ python3 invoke_runtime.py test
 
 # Direct invocation
 python3 invoke_runtime.py
+```
+
+#### Bedrock AgentCore Runtime Architecture
+
+All agents follow a standardized Bedrock AgentCore runtime pattern:
+
+**Key Features:**
+- **Memory Mandatory**: All runtime agents use persistent memory for context retention
+- **MCP Configuration Disabled**: Runtime environment disables MCP configuration since we can't install packages on runtime. Runtime agents will use AgentCore Gateway MCP server(s) instead
+- **System Prompt Constants**: Each agent uses a dedicated system prompt constant (e.g., `EKS_SYSTEM_PROMPT`, `PROMETHEUS_SYSTEM_PROMPT`)
+- **Initialization Functions**: Standardized `initialize_runtime_components()`, `setup_gateway_and_mcp()`, and `setup_memory()` functions
+- **Error Handling**: Robust error handling with graceful degradation
+
+**Runtime Configuration:**
+```python
+# MCP settings are automatically disabled for runtime
+AgentConfig.ENABLE_MCP_CONFIG = False
+AgentConfig.ENABLE_AWS_MCP = False
+
+# Runtime components initialization
+model, memory_id, memory_client, mcp_client = agent.initialize_runtime_components()
+
+# Agent creation with system prompt constant
+runtime_agent = Agent(
+    model=model,
+    tools=tools,
+    hooks=hooks,
+    system_prompt=AgentConfig.EKS_SYSTEM_PROMPT  # Agent-specific constant
+)
 ```
 
 ### Model Selection

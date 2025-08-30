@@ -14,6 +14,8 @@ A comprehensive collection of specialized AWS agents built on Amazon Bedrock Age
 ### Key Features
 
 - **AgentCore Integration** - Built on Amazon Bedrock AgentCore with memory and gateway functionality
+- **Standardized Runtime Pattern** - All agents follow consistent runtime deployment architecture
+- **Memory Mandatory** - All runtime agents use persistent memory for context retention
 - **Optimized Claude Models** - Multiple Claude model options with tuned parameters for infrastructure tasks
 - **MCP Protocol** - Model Context Protocol integration with 52+ AWS tools for comprehensive service integration
 - **Memory Management** - Persistent context and preference storage using AgentCore Memory
@@ -21,6 +23,14 @@ A comprehensive collection of specialized AWS agents built on Amazon Bedrock Age
 - **Web Search** - DuckDuckGo integration for real-time information retrieval
 - **Enhanced Error Handling** - Robust error recovery and user-friendly messaging
 - **Cross-Agent Communication** - Agent2Agent protocol for collaborative problem solving
+
+### Runtime Architecture
+
+All agents implement a standardized runtime pattern:
+- **MCP Configuration Disabled** - Runtime environment automatically disables MCP configuration to prevent conflicts
+- **System Prompt Constants** - Each agent uses dedicated system prompt constants (EKS_SYSTEM_PROMPT, etc.)
+- **Initialization Functions** - Standardized component initialization with proper error handling
+- **Graceful Degradation** - Robust error recovery ensures agents continue working even with component failures
 
 ### Model Configuration
 

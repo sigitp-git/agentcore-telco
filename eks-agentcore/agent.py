@@ -375,6 +375,47 @@ class AgentConfig:
     # Search Settings
     SEARCH_REGION = "us-en"
     
+    # System Prompt
+    EKS_SYSTEM_PROMPT = """You are AWS EKS agent. Help with EKS cluster management, Kubernetes operations, and AWS infrastructure.
+
+CRITICAL TOOL SELECTION RULES:
+- Answer from knowledge FIRST before using tools
+- Use tools ONLY when you need current/specific data
+- MAXIMUM 1 tool call per response
+- Keep responses under 300 words
+- Be direct and actionable
+
+EXPERTISE AREAS:
+- EKS cluster creation, configuration, and management
+- Kubernetes workload deployment and troubleshooting
+- Node groups, Fargate profiles, and compute management
+- EKS networking (VPC, subnets, security groups)
+- IAM roles and service accounts (IRSA)
+- EKS add-ons (AWS Load Balancer Controller, EBS CSI, etc.)
+- Helm charts and Kubernetes manifests
+- EKS monitoring and logging (CloudWatch, Prometheus)
+- EKS security best practices
+- kubectl and eksctl command usage
+- Container image management and ECR integration
+- EKS cost optimization
+- Cluster autoscaling and HPA/VPA
+- Service mesh integration (Istio, App Mesh)
+- CI/CD pipelines with EKS
+
+RESPONSE GUIDELINES:
+- Provide specific kubectl/eksctl commands when applicable
+- Include relevant YAML manifests for Kubernetes resources
+- Suggest AWS best practices for EKS
+- Recommend cost-effective and secure solutions
+- Always consider high availability and scalability
+
+NON-FUNCTIONAL RULES:
+- Be friendly, patient, and understanding with users
+- Always offer additional help after answering questions
+- If you can't help with something, direct users to the appropriate contact
+
+"""
+    
     @classmethod
     def setup_aws_region(cls):
         """Setup AWS region configuration."""
@@ -2122,6 +2163,110 @@ def initialize_agent():
     memory_id = initialize_memory()
     
     return current_model_id
+
+def initialize_runtime_components():
+    """Initialize components needed for runtime without starting interactive mode."""
+    global REGION, sts_client, gateway, gateway_url, gateway_id, mcp_client, aws_mcp_manager, memory_id, memory_client, model
+    
+    # Setup AWS region
+    REGION = AgentConfig.setup_aws_region()
+    
+    # Initialize STS client
+    sts_client = boto3.client('sts', region_name=REGION)
+    
+    # Setup gateway and MCP (will be disabled by runtime config)
+    gateway, gateway_url, gateway_id, mcp_client, aws_mcp_manager = setup_gateway_and_mcp()
+    
+    # Setup memory
+    memory_id, memory_client = setup_memory()
+    
+    # Initialize model
+    model_id = AgentConfig.get_model_id()
+    model = BedrockModel(
+        model_id=model_id, 
+        temperature=AgentConfig.MODEL_TEMPERATURE,
+        max_tokens=AgentConfig.MAX_TOKENS,
+        top_p=AgentConfig.TOP_P
+    )
+    
+    return model, memory_id, memory_client, mcp_client
+
+def setup_gateway_and_mcp():
+    """Setup gateway and MCP client for runtime use."""
+    global gateway, gateway_url, gateway_id, mcp_client, aws_mcp_manager
+    
+    # Initialize gateway - using manually created gateway
+    gateway, gateway_id = use_manual_gateway(REGION)
+    
+    # Set gateway_url from gateway dict
+    gateway_url = gateway['gateway_url'] if gateway else None
+    
+    # Initialize MCP client only if gateway is available
+    mcp_client = None
+    aws_mcp_manager = None
+    
+    if gateway and gateway_id:
+        try:
+            print(f"🔗 Setting up MCP client for gateway: {gateway_id}")
+            
+            gateway_access_token = get_token(
+                get_ssm_parameter("/app/eksagent/agentcore/machine_client_id"),
+                get_cognito_client_secret(),
+                get_ssm_parameter("/app/eksagent/agentcore/cognito_auth_scope"),
+                get_ssm_parameter("/app/eksagent/agentcore/cognito_token_url")
+            )
+            
+            print(f"🔍 Debug - Token response: {gateway_access_token}")
+            
+            # Check if we got a valid token
+            if 'error' in gateway_access_token:
+                print(f"❌ Token error: {gateway_access_token['error']}")
+                raise Exception(f"Failed to get access token: {gateway_access_token['error']}")
+            
+            if 'access_token' not in gateway_access_token:
+                print(f"❌ No access_token in response. Available keys: {list(gateway_access_token.keys())}")
+                raise Exception("No access_token in authentication response")
+
+            print(f"Gateway Endpoint - MCP URL: {gateway['gateway_url']}")
+
+            # Set up MCP client
+            mcp_client = MCPClient(
+                lambda: streamablehttp_client(
+                    gateway['gateway_url'],
+                    headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
+                )
+            )
+            print("✅ MCP client configured successfully")
+            
+            # Initialize AWS MCP Manager
+            aws_mcp_manager = AWSMCPManager(mcp_client)
+            
+        except Exception as e:
+            print(f"⚠️  MCP client setup failed: {e}")
+            print("🔄 Continuing without MCP client functionality...")
+            mcp_client = None
+            aws_mcp_manager = None
+    else:
+        print("ℹ️  No gateway available - MCP client functionality disabled")
+
+    # Initialize MCP client if available
+    if mcp_client:
+        try:
+            mcp_client.start()
+            print("✅ MCP client started successfully")
+        except Exception as e:
+            print(f"⚠️  MCP client start failed: {str(e)}")
+            mcp_client = None
+            aws_mcp_manager = None
+    
+    return gateway, gateway_url, gateway_id, mcp_client, aws_mcp_manager
+
+def setup_memory():
+    """Setup memory client and initialize memory."""
+    global memory_client, memory_id
+    memory_client = MemoryClient(region_name=REGION)
+    memory_id = initialize_memory()
+    return memory_id, memory_client
 
 def main():
     """Main execution function."""

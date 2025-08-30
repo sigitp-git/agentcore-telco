@@ -48,6 +48,7 @@ Each agent follows the same standardized structure:
 
 ### Core Agent Files
 - **agent.py** - Main agent logic, tools, memory management, MCP integration
+- **agent_runtime.py** - Standardized AgentCore Runtime wrapper with memory mandatory
 - **invoke_runtime.py** - AgentRuntimeInvoker class for programmatic access
 - **utils.py** - Shared utilities (SSM, AWS helpers, config loading)
 - **requirements.txt** - Python dependencies (consistent across agents)
@@ -83,6 +84,35 @@ Each agent follows the same standardized structure:
 
 ## Code Organization Patterns
 
+### Agent Runtime Structure
+```python
+# agent_runtime.py - Standardized runtime pattern
+# Configure MCP settings before importing agent components
+from agent import AgentConfig
+
+# Disable MCP configuration for runtime environment
+AgentConfig.ENABLE_MCP_CONFIG = False
+AgentConfig.ENABLE_AWS_MCP = False
+
+# Import agent module and initialization functions
+import agent
+from agent import create_agent_hooks, create_tools_list, AgentConfig
+
+def create_runtime_agent():
+    """Create the runtime agent with memory and tools."""
+    # Initialize runtime components
+    model, memory_id, memory_client, mcp_client = agent.initialize_runtime_components()
+    
+    # Create agent with system prompt constant
+    runtime_agent = Agent(
+        model=model,
+        tools=tools,
+        hooks=hooks,
+        system_prompt=AgentConfig.AGENT_SYSTEM_PROMPT  # Agent-specific constant
+    )
+    return runtime_agent
+```
+
 ### Agent Class Structure
 ```python
 class AgentConfig:
@@ -95,6 +125,11 @@ class AgentConfig:
     MAX_TOKENS = 4096        # Comprehensive analysis
     TOP_P = 0.9              # Balanced creativity
     
+    # System Prompt Constants
+    EKS_SYSTEM_PROMPT = """Agent-specific system prompt..."""
+    PROMETHEUS_SYSTEM_PROMPT = """Agent-specific system prompt..."""
+    # etc.
+    
 class MemoryManager:
     # Memory lifecycle management
     
@@ -103,6 +138,24 @@ class {Agent}MemoryHooks(HookProvider):
     
 class AWSMCPManager:
     # AWS MCP tools integration with enhanced error handling
+```
+
+### Standardized Initialization Functions
+```python
+def initialize_runtime_components():
+    """Initialize components needed for runtime without starting interactive mode."""
+    # Setup AWS region, STS client, gateway, MCP, memory, model
+    return model, memory_id, memory_client, mcp_client
+
+def setup_gateway_and_mcp():
+    """Setup gateway and MCP client for runtime use."""
+    # Gateway and MCP client initialization
+    return gateway, gateway_url, gateway_id, mcp_client, aws_mcp_manager
+
+def setup_memory():
+    """Setup memory client and initialize memory."""
+    # Memory client and initialization
+    return memory_id, memory_client
 ```
 
 ### Tool Definitions

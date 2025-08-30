@@ -4,6 +4,16 @@ This document summarizes the documentation consolidation performed across the AW
 
 ## 📊 Consolidation Results
 
+### Latest Updates (August 2025)
+
+#### Standardized Runtime Pattern Documentation
+- ✅ **Runtime Architecture** - Updated all documentation to reflect the standardized agent_runtime.py pattern
+- ✅ **Memory Mandatory** - Documented that all runtime agents now use persistent memory
+- ✅ **MCP Configuration** - Updated documentation to reflect automatic MCP configuration disabling in runtime
+- ✅ **System Prompt Constants** - Documented agent-specific system prompt constants (EKS_SYSTEM_PROMPT, etc.)
+- ✅ **Initialization Functions** - Documented standardized initialization functions across all agents
+- ✅ **Steering Documents** - Updated all .kiro/steering/ documents with latest patterns
+
 ### Files Consolidated and Removed
 
 #### Main Documentation

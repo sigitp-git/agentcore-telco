@@ -412,15 +412,32 @@ cd prometheus-agentcore
 python3 agent.py
 ```
 
-### Using Runtime Deployment
+### Runtime Deployment
 
-For AgentCore Runtime deployment, each agent includes a standardized runtime wrapper:
+Each agent includes a comprehensive deployment system with standardized `deploy_runtime.py` scripts:
 
 ```bash
-# Deploy to AgentCore Runtime
+# Deploy agent to AgentCore Runtime
 cd eks-agentcore
-python3 agent_runtime.py
+python3 deploy_runtime.py
 
+# Deploy with options
+python3 deploy_runtime.py --region us-west-2
+python3 deploy_runtime.py --skip-build
+python3 deploy_runtime.py --test-only
+python3 deploy_runtime.py --help-extended
+```
+
+**Deployment Features:**
+- ✅ **Automated ECR Management** - Creates repositories when needed
+- ✅ **Docker Build & Push** - Handles containerization automatically
+- ✅ **Runtime Updates** - Updates existing runtimes with confirmation
+- ✅ **Region Configuration** - Supports multi-region deployment
+- ✅ **SSM Integration** - Manages execution roles and parameters
+- ✅ **Error Handling** - Comprehensive validation and recovery
+
+**Runtime Testing:**
+```bash
 # Test runtime functionality
 python3 invoke_runtime.py interactive
 
@@ -560,6 +577,13 @@ streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 ### Latest (August 2025)
 
 #### ✨ New Features
+- **Standardized Runtime Deployment**: Complete `deploy_runtime.py` system across all agents
+  - Automated ECR repository management with creation when needed
+  - Docker build and push with comprehensive error handling
+  - Runtime update functionality with user confirmation prompts
+  - Multi-region deployment support with `--region` parameter
+  - Command-line options: `--skip-build`, `--test-only`, `--help-extended`
+  - SSM parameter management for execution roles and runtime ARNs
 - **Model Configuration Optimization**: Tuned Claude model settings for infrastructure tasks
   - `MAX_TOKENS = 4096`: Comprehensive analysis and troubleshooting
   - `TOP_P = 0.9`: Balanced creativity while maintaining technical accuracy

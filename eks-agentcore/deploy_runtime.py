@@ -8,26 +8,99 @@ import json
 import time
 import subprocess
 import sys
+import os
+import argparse
 from datetime import datetime
 from utils import get_ssm_parameter, put_ssm_parameter
+
+# Set default AWS region
+DEFAULT_REGION = 'us-east-1'
+
+def setup_aws_region():
+    """Setup AWS region configuration."""
+    # Check for region in environment variables
+    region = os.environ.get('AWS_DEFAULT_REGION') or os.environ.get('AWS_REGION')
+    
+    if not region:
+        # Try to get region from AWS config
+        try:
+            session = boto3.Session()
+            region = session.region_name
+        except Exception:
+            region = None
+    
+    if not region:
+        region = DEFAULT_REGION
+        print(f"⚠️  No AWS region configured, using default: {region}")
+    
+    # Validate region format (basic check)
+    if not region or len(region) < 3 or '-' not in region:
+        print(f"⚠️  Invalid region format: {region}, using default: {DEFAULT_REGION}")
+        region = DEFAULT_REGION
+    
+    # Set environment variables to ensure consistency
+    os.environ['AWS_DEFAULT_REGION'] = region
+    os.environ['AWS_REGION'] = region
+    
+    print(f"🌍 AWS region configured: {region}")
+    return region
+
+def print_usage_help():
+    """Print usage help and examples."""
+    print("\n💡 Usage Examples:")
+    print("   python3 deploy_runtime.py                    # Deploy with auto-detected region")
+    print("   python3 deploy_runtime.py --region us-west-2 # Deploy to specific region")
+    print("   python3 deploy_runtime.py --skip-build       # Skip Docker build (use existing image)")
+    print("   python3 deploy_runtime.py --test-only        # Test existing deployment only")
+    print("\n📋 Prerequisites:")
+    print("   - Docker installed and running")
+    print("   - AWS CLI configured with appropriate permissions")
+    print("   - AWS credentials configured (via AWS CLI, environment, or IAM role)")
+    print("\n🔑 Required AWS Permissions:")
+    print("   - ECR: CreateRepository, DescribeRepositories, GetAuthorizationToken")
+    print("   - Bedrock AgentCore: CreateAgentRuntime, UpdateAgentRuntime, ListAgentRuntimes")
+    print("   - SSM: GetParameter, PutParameter")
+    print("   - STS: GetCallerIdentity")
 
 class AgentRuntimeDeployer:
     """Handles deployment of the agent to AgentCore Runtime."""
     
-    def __init__(self, region="us-east-1"):
+    def __init__(self, region=None):
+        # Use provided region or setup from environment/config
+        if region is None:
+            region = setup_aws_region()
+        
         self.region = region
-        self.ecr_client = boto3.client('ecr', region_name=region)
-        self.agentcore_client = boto3.client('bedrock-agentcore-control', region_name=region)
-        self.sts_client = boto3.client('sts', region_name=region)
+        
+        # Initialize AWS clients with explicit region
+        try:
+            self.ecr_client = boto3.client('ecr', region_name=region)
+            self.agentcore_client = boto3.client('bedrock-agentcore-control', region_name=region)
+            self.sts_client = boto3.client('sts', region_name=region)
+            print(f"✅ AWS clients initialized for region: {region}")
+        except Exception as e:
+            print(f"❌ Failed to initialize AWS clients: {e}")
+            print("💡 Please check your AWS credentials and region configuration")
+            raise
         
         # Configuration
         self.repository_name = "eks-agent-runtime"
-        self.agent_runtime_name = "devops_agent"
+        self.agent_runtime_name = "eks_agent"
         self.image_tag = "latest"
         
-        # Get account ID
-        self.account_id = self.sts_client.get_caller_identity()['Account']
+        # Get account ID and validate AWS access
+        try:
+            identity = self.sts_client.get_caller_identity()
+            self.account_id = identity['Account']
+            print(f"✅ AWS Account ID: {self.account_id}")
+            print(f"✅ AWS User/Role: {identity.get('Arn', 'Unknown')}")
+        except Exception as e:
+            print(f"❌ Failed to get AWS account identity: {e}")
+            print("💡 Please check your AWS credentials")
+            raise
+        
         self.ecr_uri = f"{self.account_id}.dkr.ecr.{self.region}.amazonaws.com/{self.repository_name}"
+        print(f"📦 ECR URI: {self.ecr_uri}")
         
     def create_ecr_repository(self):
         """Create ECR repository if it doesn't exist."""
@@ -114,7 +187,7 @@ class AgentRuntimeDeployer:
     def get_execution_role_arn(self):
         """Get or create execution role ARN for AgentCore Runtime."""
         # Try to get from SSM first
-        role_arn = get_ssm_parameter("/app/devopsagent/agentcore/execution_role_arn")
+        role_arn = get_ssm_parameter("/app/eksagent/agentcore/execution_role_arn")
         
         if role_arn:
             print(f"✅ Using execution role from SSM: {role_arn}")
@@ -124,7 +197,7 @@ class AgentRuntimeDeployer:
         default_role_name = "AgentRuntimeExecutionRole"
         default_role_arn = f"arn:aws:iam::{self.account_id}:role/{default_role_name}"
         
-        print(f"⚠️  No execution role found in SSM parameter: /app/devopsagent/agentcore/execution_role_arn")
+        print(f"⚠️  No execution role found in SSM parameter: /app/eksagent/agentcore/execution_role_arn")
         print(f"💡 Please create an IAM role with AgentCore Runtime permissions")
         print(f"   Suggested role name: {default_role_name}")
         print(f"   Required permissions: bedrock:*, logs:*, ecr:GetAuthorizationToken")
@@ -136,7 +209,7 @@ class AgentRuntimeDeployer:
             role_arn = default_role_arn
         
         # Save to SSM for future use
-        put_ssm_parameter("/app/devopsagent/agentcore/execution_role_arn", role_arn)
+        put_ssm_parameter("/app/eksagent/agentcore/execution_role_arn", role_arn)
         print(f"✅ Saved execution role to SSM: {role_arn}")
         
         return role_arn
@@ -250,47 +323,98 @@ class AgentRuntimeDeployer:
 
 def main():
     """Main deployment function."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Deploy EKS Agent to Amazon Bedrock AgentCore Runtime')
+    parser.add_argument('--region', '-r', 
+                       help=f'AWS region for deployment (default: {DEFAULT_REGION})',
+                       default=None)
+    parser.add_argument('--skip-build', 
+                       action='store_true',
+                       help='Skip Docker build and push (use existing image)')
+    parser.add_argument('--test-only', 
+                       action='store_true',
+                       help='Only test existing deployment without creating new resources')
+    parser.add_argument('--help-extended', 
+                       action='store_true',
+                       help='Show extended help with examples and prerequisites')
+    
+    args = parser.parse_args()
+    
+    # Handle extended help
+    if args.help_extended:
+        print_usage_help()
+        sys.exit(0)
+    
     print("🚀 EKS Agent Runtime Deployment")
     print("=" * 50)
     
+    # Setup AWS region first
+    print("🌍 Setting up AWS configuration...")
+    if args.region:
+        os.environ['AWS_DEFAULT_REGION'] = args.region
+        os.environ['AWS_REGION'] = args.region
+        region = args.region
+        print(f"🌍 Using specified region: {region}")
+    else:
+        region = setup_aws_region()
+    
     # Check prerequisites
-    print("🔍 Checking prerequisites...")
+    print("\n🔍 Checking prerequisites...")
     
     # Check Docker
     try:
-        subprocess.run(["docker", "--version"], capture_output=True, check=True)
-        print("✅ Docker is available")
+        result = subprocess.run(["docker", "--version"], capture_output=True, check=True, text=True)
+        print(f"✅ Docker is available: {result.stdout.strip()}")
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("❌ Docker is not available. Please install Docker.")
         sys.exit(1)
     
     # Check AWS CLI
     try:
-        subprocess.run(["aws", "--version"], capture_output=True, check=True)
-        print("✅ AWS CLI is available")
+        result = subprocess.run(["aws", "--version"], capture_output=True, check=True, text=True)
+        print(f"✅ AWS CLI is available: {result.stdout.strip()}")
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("❌ AWS CLI is not available. Please install AWS CLI.")
         sys.exit(1)
     
     # Check Docker buildx
     try:
-        subprocess.run(["docker", "buildx", "version"], capture_output=True, check=True)
-        print("✅ Docker buildx is available")
+        result = subprocess.run(["docker", "buildx", "version"], capture_output=True, check=True, text=True)
+        print(f"✅ Docker buildx is available")
     except subprocess.CalledProcessError:
         print("⚠️  Docker buildx not available. Creating buildx instance...")
-        subprocess.run(["docker", "buildx", "create", "--use"], check=True)
-        print("✅ Docker buildx configured")
+        try:
+            subprocess.run(["docker", "buildx", "create", "--use"], check=True)
+            print("✅ Docker buildx configured")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to configure Docker buildx: {e}")
+            sys.exit(1)
     
-    # Start deployment
-    deployer = AgentRuntimeDeployer()
+    # Start deployment with configured region
+    print(f"\n🚀 Starting deployment in region: {region}")
+    deployer = AgentRuntimeDeployer(region=region)
+    
+    # Handle test-only mode
+    if args.test_only:
+        print("🧪 Test-only mode: Testing existing deployment...")
+        runtime_arn = get_ssm_parameter("/app/eksagent/agentcore/runtime_arn")
+        if runtime_arn:
+            deployer.test_deployment(runtime_arn)
+        else:
+            print("❌ No existing runtime ARN found in SSM parameters")
+            sys.exit(1)
+        return
     
     # Step 1: Create ECR repository
     deployer.create_ecr_repository()
     
-    # Step 2: Build and push image
-    if not deployer.build_and_push_image():
-        print("❌ Deployment failed at image build/push step")
-        sys.exit(1)
+    # Step 2: Build and push image (unless skipped)
+    if not args.skip_build:
+        if not deployer.build_and_push_image():
+            print("❌ Deployment failed at image build/push step")
+            sys.exit(1)
+    else:
+        print("⏭️  Skipping Docker build and push (using existing image)")
     
     # Step 3: Deploy to AgentCore Runtime
     agent_runtime_arn = deployer.deploy_agent_runtime()

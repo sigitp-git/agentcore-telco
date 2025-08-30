@@ -4,11 +4,18 @@ This document consolidates all agent-specific improvements, fixes, and technical
 
 ## Latest Runtime Pattern (August 2025)
 
-### Standardized Agent Runtime Architecture
+### Standardized Agent Runtime Architecture & Deployment
 
-All agents now follow a consistent runtime pattern for AgentCore deployment:
+All agents now follow a consistent runtime pattern for AgentCore deployment with comprehensive deployment automation:
 
 #### Key Runtime Features
+- **Comprehensive Deployment System**: Standardized `deploy_runtime.py` across all agents with:
+  - Automated ECR repository management (creates when needed)
+  - Docker build and push with comprehensive error handling
+  - Runtime update functionality with user confirmation prompts
+  - Multi-region deployment support with `--region` parameter
+  - Command-line options: `--skip-build`, `--test-only`, `--help-extended`
+  - SSM parameter management for execution roles and runtime ARNs
 - **Memory Mandatory**: All runtime agents use persistent memory for context retention
 - **MCP Configuration Disabled**: Runtime environment automatically disables MCP configuration to prevent initialization conflicts
 - **System Prompt Constants**: Each agent uses a dedicated system prompt constant stored in `AgentConfig`
@@ -42,6 +49,32 @@ def create_runtime_agent():
     )
     return runtime_agent
 ```
+
+#### Standardized Deployment System
+
+All agents now include a comprehensive `deploy_runtime.py` script with:
+
+**Core Deployment Features:**
+- **ECR Repository Management**: Automatically creates ECR repositories when needed
+- **Docker Build & Push**: Handles containerization with comprehensive error handling
+- **Runtime Updates**: Updates existing runtimes with user confirmation prompts
+- **Multi-Region Support**: Deploy to any AWS region with `--region` parameter
+- **SSM Integration**: Manages execution roles and runtime ARNs in Parameter Store
+
+**Command-Line Options:**
+```bash
+python3 deploy_runtime.py                    # Standard deployment
+python3 deploy_runtime.py --region us-west-2 # Deploy to specific region
+python3 deploy_runtime.py --skip-build       # Skip Docker build step
+python3 deploy_runtime.py --test-only        # Test deployment without changes
+python3 deploy_runtime.py --help-extended    # Show detailed help
+```
+
+**Deployment Status (August 2025):**
+- ✅ **EKS Agent**: Successfully deployed with new ECR repository
+- ✅ **VPC Agent**: Successfully deployed with new ECR repository  
+- ✅ **Outposts Agent**: Existing runtime ready (deployment available)
+- ✅ **Prometheus Agent**: Successfully deployed with existing ECR repository
 
 #### Standardized Initialization Functions
 

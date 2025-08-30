@@ -49,20 +49,33 @@ python3 agent.py
 # Interactive model selection
 python3 agent.py --select-model
 
-# Runtime deployment
-python3 agent_runtime.py
+# Comprehensive runtime deployment
+python3 deploy_runtime.py
+
+# Deployment with options
+python3 deploy_runtime.py --region us-west-2
+python3 deploy_runtime.py --skip-build
+python3 deploy_runtime.py --test-only
 
 # Runtime invocation
 python3 invoke_runtime.py interactive
 ```
 
 #### Agent Runtime Pattern
-All agents follow a standardized runtime architecture:
+All agents follow a standardized runtime architecture with comprehensive deployment:
 
 ```bash
-# Runtime deployment with standardized pattern
+# Standardized deployment system across all agents
 cd eks-agentcore/
-python3 agent_runtime.py
+python3 deploy_runtime.py
+
+# Key deployment features:
+# - Automated ECR repository management
+# - Docker build and push with error handling
+# - Runtime update functionality with user confirmation
+# - Multi-region deployment support
+# - SSM parameter management for execution roles
+# - Command-line options for different deployment scenarios
 
 # Key runtime features:
 # - Memory mandatory for context retention

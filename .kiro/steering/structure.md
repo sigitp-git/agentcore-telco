@@ -49,6 +49,7 @@ Each agent follows the same standardized structure:
 ### Core Agent Files
 - **agent.py** - Main agent logic, tools, memory management, MCP integration
 - **agent_runtime.py** - Standardized AgentCore Runtime wrapper with memory mandatory
+- **deploy_runtime.py** - Comprehensive deployment system with ECR, Docker, and runtime management
 - **invoke_runtime.py** - AgentRuntimeInvoker class for programmatic access
 - **utils.py** - Shared utilities (SSM, AWS helpers, config loading)
 - **requirements.txt** - Python dependencies (consistent across agents)

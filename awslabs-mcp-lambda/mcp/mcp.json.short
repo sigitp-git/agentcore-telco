@@ -6,6 +6,8 @@
                 "awslabs.core-mcp-server@latest"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "FASTMCP_LOG_LEVEL": "ERROR",
                 "AWS_DEFAULT_REGION": "us-east-1",
                 "AWS_REGION": "us-east-1"
@@ -19,6 +21,8 @@
                 "awslabs.aws-documentation-mcp-server@latest"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "FASTMCP_LOG_LEVEL": "ERROR",
                 "AWS_DEFAULT_REGION": "us-east-1",
                 "AWS_REGION": "us-east-1"
@@ -37,6 +41,8 @@
                 "--allow-sensitive-data-access"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "FASTMCP_LOG_LEVEL": "ERROR",
                 "AWS_DEFAULT_REGION": "us-east-1",
                 "AWS_REGION": "us-east-1"
@@ -56,6 +62,8 @@
                 "us-east-1"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "FASTMCP_LOG_LEVEL": "ERROR",
                 "AWS_DEFAULT_REGION": "us-east-1",
                 "AWS_REGION": "us-east-1"
@@ -78,6 +86,8 @@
                 "https://knowledge-mcp.global.api.aws"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "FASTMCP_LOG_LEVEL": "ERROR"
             },
             "disabled": false,
@@ -91,6 +101,8 @@
                 "awslabs.cloudwatch-mcp-server@latest"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "FASTMCP_LOG_LEVEL": "ERROR",
                 "AWS_DEFAULT_REGION": "us-east-1",
                 "AWS_REGION": "us-east-1"
@@ -104,6 +116,8 @@
                 "awslabs.ccapi-mcp-server@latest"
             ],
             "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
                 "DEFAULT_TAGS": "enabled",
                 "SECURITY_SCANNING": "enabled",
                 "FASTMCP_LOG_LEVEL": "ERROR",

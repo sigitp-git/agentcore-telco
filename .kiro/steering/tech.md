@@ -89,3 +89,51 @@ Each agent requires specific SSM parameters:
 - Default region: `us-east-1`
 - Requires appropriate IAM permissions for each agent's AWS services
 - Uses AWS CLI configuration or environment variables
+
+## Model Configuration
+
+### Claude Model Settings
+All agents are configured with optimized model parameters:
+
+```python
+# Model Settings (in AgentConfig class)
+MODEL_TEMPERATURE = 0.3  # Deterministic responses for consistent troubleshooting
+MAX_TOKENS = 4096        # Sufficient for detailed analysis and comprehensive responses  
+TOP_P = 0.9              # Balanced creativity for problem-solving while maintaining technical accuracy
+```
+
+### Available Models
+- **Claude Sonnet 4** - Latest, most capable model
+- **Claude 3.7 Sonnet** - Enhanced reasoning capabilities
+- **Claude 3.5 Sonnet v2** - Balanced performance (recommended)
+- **Claude 3.5 Sonnet v1** - Stable version
+- **Claude 3.5 Haiku** - Fast & efficient (default for development)
+
+### Model Selection
+```bash
+# Interactive model selection
+python3 agent.py --select-model
+
+# Programmatic model selection
+from agent import AgentConfig
+AgentConfig.set_model('claude-3-5-sonnet-v2')
+```
+
+## Error Handling & Reliability
+
+### MCP Tools Integration
+- **Smart Error Detection** - Identifies common MCP validation errors
+- **Clean Error Messages** - User-friendly error reporting instead of technical stack traces
+- **Graceful Degradation** - Agents continue working even when MCP tools are unavailable
+- **Multiple Fallback Mechanisms** - Robust error recovery for various failure scenarios
+
+### Memory Management
+- **AgentCore Memory Integration** - Persistent context and conversation history
+- **Automatic Cleanup** - Proper resource cleanup on agent shutdown
+- **Error Recovery** - Graceful handling of memory service unavailability
+
+### Best Practices
+- Always use try-catch blocks for external service calls
+- Provide informative error messages to users
+- Implement timeout mechanisms for long-running operations
+- Use structured logging for debugging and monitoring

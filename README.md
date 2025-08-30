@@ -11,6 +11,12 @@ This project contains four specialized AI agents, each tailored for specific AWS
 - **Outposts Agent** - AWS Outposts hybrid cloud infrastructure
 - **Prometheus Agent** - Monitoring and observability with Amazon Managed Prometheus
 
+### Telecommunications Multi-Agent Architecture
+
+The project implements a sophisticated multi-agent collaboration pattern specifically designed for telecommunications infrastructure management. Each telco network function (UPF, AMF, SMF, vCU, vDU) is paired with intelligent agentic sidecars that communicate with our specialized AWS agents for comprehensive infrastructure management.
+
+📋 **Architecture details are included in the Agent Capabilities & Architecture section below.**
+
 ## 📁 Project Structure
 
 ```
@@ -19,12 +25,17 @@ agentcore-telco/
 ├── .env.agents                  # Actual environment (never commit)
 ├── .gitignore                   # Comprehensive ignore rules
 ├── README.md                    # Main project documentation
+├── LICENSE                      # MIT License for the entire project
 ├── test_agents.py               # Comprehensive test suite
 ├── .kiro/                       # Kiro IDE configuration
 │   └── steering/                # AI assistant guidance documents
 │       ├── product.md           # Product overview
 │       ├── tech.md              # Technology stack
 │       └── structure.md         # Project structure
+├── docs/                        # Documentation
+│   ├── AGENT_IMPROVEMENTS.md    # Consolidated agent improvements and technical details
+│   ├── DOCUMENTATION_CONSOLIDATION_SUMMARY.md # Documentation consolidation summary
+│   └── telco-architecture-pattern.md # Telco architecture patterns
 ├── eks-agentcore/               # EKS Agent
 │   ├── agent.py                 # Main agent implementation
 │   ├── agent_runtime.py         # Runtime configuration
@@ -36,9 +47,7 @@ agentcore-telco/
 │   ├── activate_env.sh          # Environment activation script
 │   ├── run_streamlit.sh         # Streamlit launcher
 │   ├── Dockerfile.runtime       # Container configuration
-│   ├── LICENSE                  # License file
 │   └── streamlit/               # Streamlit web application
-│       ├── README.md
 │       ├── demo_streamlit.py
 │       ├── run_streamlit.sh
 │       └── streamlit_app.py
@@ -53,7 +62,7 @@ agentcore-telco/
 │       └── MCP_FIXES_SUMMARY.md # Summary of MCP fixes and improvements
 └── agent2agent/                 # Agent2Agent protocol integration
     ├── README.md                # A2A documentation
-    ├── QUICK_START.md           # Quick start guide
+
     ├── types.py                 # A2A type definitions and data models
     ├── __init__.py              # Package initialization
     ├── docs/                    # Integration guides
@@ -74,6 +83,9 @@ This project includes **Agent2Agent protocol integration**, enabling cross-agent
 ```bash
 # Run the A2A integration example
 python3 run_a2a_example.py
+
+# Or run directly
+python3 agent2agent/examples/a2a_integration_example_full.py
 ```
 
 **Key A2A Features:**
@@ -81,6 +93,45 @@ python3 run_a2a_example.py
 - **Cross-Agent Messaging** - Structured communication between agents
 - **Agent Cards** - Standardized capability discovery and registration
 - **Enhanced Troubleshooting** - Multi-domain collaborative problem solving
+
+#### A2A Usage in Your Code
+
+```python
+# Import A2A types for protocol communication
+from agent2agent.types import (
+    AgentCard, AgentCapabilities, AgentSkill, Message, TextPart, Role
+)
+
+# Import the EKS A2A wrapper
+from agent2agent.wrappers.eks_a2a_wrapper import EKSA2AWrapper
+
+# Create wrapper for your EKS agent
+eks_agent = YourEKSAgent()
+a2a_wrapper = EKSA2AWrapper(eks_agent)
+
+# Enhanced troubleshooting with cross-agent collaboration
+result = await a2a_wrapper.enhanced_pod_troubleshooting(
+    pod_name="web-app-123",
+    namespace="production", 
+    cluster_name="prod-cluster"
+)
+```
+
+#### Cross-Agent Communication
+
+```python
+# Request VPC analysis
+vpc_response = await a2a_wrapper.send_request_to_agent("VPC-Agent", {
+    "action": "analyze_network_connectivity",
+    "vpc_id": "vpc-prod-123"
+})
+
+# Request metrics from Prometheus
+metrics = await a2a_wrapper.send_request_to_agent("Prometheus-Agent", {
+    "action": "get_cluster_metrics",
+    "cluster_name": "prod-cluster"
+})
+```
 
 See [agent2agent/README.md](agent2agent/README.md) for complete A2A documentation.
 
@@ -210,6 +261,9 @@ The project includes comprehensive MCP integration with AWS services through the
 📚 **For detailed MCP integration information, see:**
 - [MCP Integration Guide](awslabs-mcp-lambda/mcp/MCP_INTEGRATION_GUIDE.md) - Comprehensive setup and troubleshooting
 - [MCP Fixes Summary](awslabs-mcp-lambda/mcp/MCP_FIXES_SUMMARY.md) - Recent improvements and fixes
+- [MCP Lambda Documentation](awslabs-mcp-lambda/README.md) - Serverless MCP deployment guide
+- [Library Overview](awslabs-mcp-lambda/LIBRARY_OVERVIEW.md) - Technical details of the MCP Lambda library
+- [Deployment Status](awslabs-mcp-lambda/DEPLOYMENT_SUCCESS.md) - Current deployment status and results
 
 ### SSM Parameters
 
@@ -239,30 +293,66 @@ Each agent requires specific SSM parameters for authentication and configuration
 - `/app/prometheusagent/agentcore/cognito_token_url`
 - `/app/prometheusagent/agentcore/runtime_arn`
 
-## 🎯 Agent Capabilities
+## 🎯 Agent Capabilities & Architecture
 
-### EKS Agent
+### System Architecture Overview
+
+The AWS AgentCore Telco project implements a multi-agent architecture designed for telecommunications and cloud infrastructure management. The system consists of specialized AI agents that collaborate to provide comprehensive AWS infrastructure management.
+
+#### Communication Patterns
+
+1. **Agent-to-AgentCore Communication**
+   ```
+   Agent ←→ AgentCore Runtime ←→ Memory Service
+     ↓
+   Gateway ←→ MCP Servers ←→ AWS Services
+   ```
+
+2. **Cross-Agent Communication (A2A)**
+   ```
+   EKS Agent ←→ A2A Protocol ←→ VPC Agent
+       ↓                           ↓
+   Prometheus Agent ←→ A2A ←→ Outposts Agent
+   ```
+
+3. **MCP Integration Architecture**
+   ```
+   Agent ←→ MCP Client ←→ MCP Server ←→ AWS Service
+                    ↓
+               Lambda Function (Serverless)
+                    ↓
+               AWS Service API
+   ```
+
+### Agent Capabilities
+
+#### EKS Agent
 - **Cluster Management**: Create, configure, and manage EKS clusters
 - **Node Group Operations**: Manage worker nodes and auto-scaling
-- **Troubleshooting**: Diagnose and resolve EKS-related issues
+- **Troubleshooting**: Diagnose and resolve EKS-related issues with enhanced error handling
 - **Security**: Configure RBAC, security groups, and IAM roles
 - **Monitoring**: Integration with CloudWatch and container insights
+- **MCP Integration**: 16 specialized EKS tools for Kubernetes operations
+- **Memory Management**: EKS-specific context retention and conversation history
+- **Resource Cleanup**: Proper cleanup prevents resource leaks and hanging processes
 
-### VPC Agent
+#### VPC Agent
 - **Network Architecture**: Design and implement VPC topologies
 - **Connectivity**: Configure VPN, Direct Connect, and peering
 - **Security Groups**: Manage firewall rules and network ACLs
 - **Routing**: Configure route tables and traffic flow
 - **Troubleshooting**: Network connectivity and performance issues
+- **Cross-Agent Integration**: Collaborate with EKS and Outposts agents for network analysis
 
-### Outposts Agent
+#### Outposts Agent
 - **Hybrid Infrastructure**: Manage on-premises AWS Outposts
 - **Capacity Planning**: Monitor and optimize resource utilization
 - **Connectivity**: Ensure reliable connection to AWS regions
 - **Local Services**: Configure and manage local AWS services
 - **Maintenance**: Coordinate updates and maintenance windows
+- **Telco Integration**: Specialized support for 5G network functions
 
-### Prometheus Agent
+#### Prometheus Agent
 - **Metrics Collection**: Configure Prometheus data sources and Amazon Managed Prometheus
 - **Query Optimization**: Write and optimize PromQL queries with real-time execution
 - **MCP Integration**: 52 AWS MCP tools for comprehensive AWS service integration
@@ -272,6 +362,31 @@ Each agent requires specific SSM parameters for authentication and configuration
 - **Visualization**: Integration with Grafana and custom dashboards
 - **Troubleshooting**: Diagnose monitoring, alerting, and MCP integration issues
 - **AWS Services**: Direct integration with EKS, CloudWatch, and AWS documentation
+- **Enhanced Reliability**: Robust error handling with timeout protection and graceful exit
+
+### Telco Multi-Agent Collaboration Pattern
+
+#### 5G Network Function Integration
+The architecture supports 5G network functions through intelligent sidecars:
+
+**5G Core Functions:**
+- **UPF (User Plane Function)**: Data traffic routing
+- **AMF (Access and Mobility Management)**: Device registration and mobility
+- **SMF (Session Management Function)**: Session management
+- **vCU (Centralized Unit)**: RAN Layer 2/3 functions
+- **vDU (Distributed Unit)**: RAN Layer 1/2 functions
+
+**Agentic Sidecars:**
+Each telco container is paired with an intelligent sidecar that:
+- Monitors container health and performance
+- Communicates with AWS agents for infrastructure management
+- Provides correlation between telco functions and AWS services
+- Enables automated remediation and optimization
+
+#### Communication Flow
+1. **Telco Container ↔ Agentic Sidecar**: 1:1 pairing for health monitoring
+2. **Agentic Sidecar ↔ AWS Agents**: Many-to-many for infrastructure management
+3. **AWS Agent ↔ AgentCore Gateway**: 1:1 dedicated connection for tool execution
 
 ## 🛠️ Usage
 
@@ -329,6 +444,15 @@ Available models:
 - **Claude 3.5 Sonnet v1** - Stable version
 - **Claude 3.5 Haiku** - Fast & efficient (default)
 
+### Model Configuration
+
+All agents are optimized with the following model settings:
+- **Temperature: 0.3** - Deterministic responses for consistent troubleshooting
+- **Max Tokens: 4096** - Sufficient for detailed analysis and comprehensive responses
+- **Top-P: 0.9** - Balanced creativity for problem-solving while maintaining technical accuracy
+
+These settings are specifically tuned for infrastructure management tasks, providing reliable and detailed responses for complex AWS operations.
+
 ### Streamlit Web Interface
 
 Each agent includes a modern web interface built with Streamlit:
@@ -341,41 +465,105 @@ cd eks-agentcore/streamlit
 # Or from the agent root directory
 cd eks-agentcore
 ./run_streamlit.sh
+
+# Manual launch (from streamlit directory)
+streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 ```
 
-Features:
+**Features:**
 - 🎨 Modern AWS-themed web interface
 - 💬 Real-time chat with agents
-- 🤖 Interactive model selector
+- 🤖 Interactive model selector with 5 Claude models
 - 📋 Pre-built example prompts
 - 🔄 Session management controls
 - 📱 Mobile-friendly responsive design
+- ⚡ Direct integration with AgentCore Runtime
+- 🔧 Real-time model switching with visual feedback
 
-Access at: http://localhost:8501
+**Access:** http://localhost:8501 (local) or http://your-ip:8501 (network)
 
-## 🔄 Recent Updates
+**Requirements:**
+- Python 3.8+
+- Streamlit >= 1.28.0
+- AWS credentials configured
+- Access to deployed AWS Agent
 
-### MCP Tools Integration Fixes (Latest)
-- ✅ **Fixed MCP Loading**: Resolved MCP tools not loading from mcp.json configuration
-- ✅ **Eliminated Duplicate Output**: Fixed verbose logging causing duplicate responses
-- ✅ **Enhanced Logging Control**: Added comprehensive logging suppression for clean output
-- ✅ **52 AWS MCP Tools**: Successfully loading all MCP servers (core, aws-documentation, eks, prometheus, aws-knowledge, cloudwatch, ccapi)
-- ✅ **Prometheus Agent**: Full MCP integration with Amazon Managed Prometheus
+**Files in each agent's streamlit/ directory:**
+- `streamlit_app.py` - Main Streamlit application
+- `run_streamlit.sh` - Launch script for the Streamlit app
+- `demo_streamlit.py` - Demo script showcasing features
 
-### Agent2Agent Integration Fixes
-- ✅ **Fixed Import Issues**: Resolved `ModuleNotFoundError: No module named 'a2a'`
-- ✅ **Complete Type System**: Added comprehensive `agent2agent.types` module
-- ✅ **Protocol Validation**: Type-safe A2A communication with validation
-- ✅ **Enhanced Documentation**: Updated all A2A documentation and examples
-- ✅ **Working Examples**: All A2A integration examples now run successfully
+## 📋 Version History & Agent Improvements
 
-### Key Improvements
-- **MCP Integration**: Full Model Context Protocol support with 52 AWS tools
-- **Clean Output**: Eliminated duplicate logging and verbose MCP server output
-- **Type Safety**: Full type definitions for AgentCard, Message, Capabilities
-- **Error Handling**: Proper validation and error messages for A2A types
-- **Documentation**: Complete documentation updates across all modules
-- **Testing**: Verified A2A integration works end-to-end
+### Latest (August 2025)
+
+#### ✨ New Features
+- **Model Configuration Optimization**: Tuned Claude model settings for infrastructure tasks
+  - `MAX_TOKENS = 4096`: Comprehensive analysis and troubleshooting
+  - `TOP_P = 0.9`: Balanced creativity while maintaining technical accuracy
+  - `Temperature = 0.3`: Consistent, deterministic responses
+- **Enhanced MCP Error Handling**: Smart error detection and user-friendly messages
+- **Agent2Agent Type System**: Complete type definitions with validation
+
+#### 🐛 Bug Fixes & Agent-Specific Improvements
+
+##### EKS Agent Enhancements
+- **MCP Tools Validation Error**: Fixed `ListToolsResult tools Field required` error
+  - Enhanced `get_full_tools_list()` to handle different response formats
+  - Added proper error handling for empty responses and type checking
+- **Memory Initialization**: Fixed `NameError: name 'memory_name' is not defined`
+  - Updated memory functions to accept parameters instead of global variables
+  - Improved `create_or_get_memory_resource()` and `initialize_memory()` functions
+- **Enhanced Configuration**: Updated SSM parameters to use `/app/eksagent/` prefix
+- **Improved Tool Management**: Better tool aggregation and dynamic loading
+
+##### Prometheus Agent Enhancements
+- **Exit Hang Fix**: Resolved indefinite hanging when users typed 'exit'
+  - Added aggressive timeouts (2-5 seconds) for problematic MCP servers
+  - Implemented cleanup timeouts with force exit fallback
+  - Fixed region initialization issues in `use_manual_gateway()`
+- **Resource Cleanup**: Enhanced MCP resource cleanup to prevent leaks
+  - Added detailed logging for cleanup steps
+  - Implemented graceful termination with multiple fallback methods
+  - Added context manager support and signal handling
+- **Duplicate Output Fix**: Eliminated duplicate agent responses
+  - Changed strands logging level from INFO to WARNING
+  - Moved initialization code to prevent duplicate output on import
+- **Memory Initialization**: Fixed undefined variable errors in memory setup
+
+#### 🔧 General Improvements
+- **Error Message Style**: Standardized reporting across all agents
+- **User Experience**: Cleaner and more informative error messages
+- **Agent Reliability**: Enhanced error handling ensures agents continue working
+- **MCP Response Handling**: Enhanced support for various response formats
+- **A2A Import Issues**: Resolved `ModuleNotFoundError: No module named 'a2a'`
+
+### Previous Release (December 2024)
+
+#### 🏗️ Agent2Agent Integration
+- Complete type system in `agent2agent/types.py`
+- Cross-agent communication with proper type safety
+- Enhanced troubleshooting workflows with multi-agent collaboration
+- Working A2A integration examples
+
+#### 🔧 MCP Tools Integration
+- Fixed MCP tools not loading from configuration
+- 52 AWS MCP tools successfully integrated
+- Comprehensive logging suppression for clean output
+
+### Foundation Release
+
+#### 🏗️ Core Framework
+- Initial implementation of EKS, VPC, Outposts, and Prometheus agents
+- Amazon Bedrock AgentCore integration with memory management
+- AWS Cognito authentication and SSM parameter store integration
+- Multi-model Claude support with optimized settings
+
+#### 🔗 Integration Features
+- MCP (Model Context Protocol) integration with 52 AWS tools
+- Streamlit web interfaces for all agents
+- DuckDuckGo search integration
+- Comprehensive test suite and Docker containerization support
 
 ## 🧪 Testing
 
@@ -558,6 +746,7 @@ These documents help AI assistants understand the project context, coding standa
 ## 📚 Additional Resources
 
 ### Project Documentation
+- [Agent Improvements](docs/AGENT_IMPROVEMENTS.md) - Consolidated agent improvements and technical details
 - [MCP Integration Guide](awslabs-mcp-lambda/mcp/MCP_INTEGRATION_GUIDE.md) - Complete MCP setup and troubleshooting
 - [MCP Fixes Summary](awslabs-mcp-lambda/mcp/MCP_FIXES_SUMMARY.md) - Recent MCP improvements and fixes
 - [Agent2Agent Documentation](agent2agent/README.md) - Cross-agent communication protocol

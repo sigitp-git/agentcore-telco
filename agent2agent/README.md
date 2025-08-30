@@ -173,6 +173,8 @@ complex_message = Message(
 - [Integration Guide](docs/A2A_INTEGRATION_GUIDE.md) - Complete implementation guide
 - [Implementation Summary](docs/A2A_IMPLEMENTATION_SUMMARY.md) - What we've built
 
+For quick start information, see the main project [README.md](../README.md) which includes A2A usage examples.
+
 ## Examples
 
 - [Basic Example](examples/a2a_example.py) - Explore A2A data structures

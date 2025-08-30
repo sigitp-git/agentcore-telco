@@ -195,16 +195,42 @@ class AWSMCPManager:
         """Get tools from an MCP client."""
         try:
             tools = client.list_tools_sync()
-            if tools:
-                # Add server name prefix to tool names for identification
-                for tool in tools:
+            
+            # Handle different response formats
+            if isinstance(tools, dict):
+                # Check if it's a valid tools response with 'tools' field
+                if 'tools' in tools and tools['tools']:
+                    tools_list = tools['tools']
+                else:
+                    print(f"ℹ️  {server_name} returned empty tools dict")
+                    return []
+            elif isinstance(tools, list):
+                tools_list = tools
+            elif tools is None:
+                print(f"ℹ️  {server_name} returned no tools")
+                return []
+            else:
+                print(f"⚠️  {server_name} returned unexpected format: {type(tools)}")
+                return []
+            
+            # Add server name prefix to tool names for identification
+            if tools_list:
+                for tool in tools_list:
                     if hasattr(tool, 'name'):
                         tool._original_name = tool.name
                         tool._server_name = server_name
-                return tools if hasattr(tools, '__iter__') else [tools]
+                return tools_list
             return []
+            
         except Exception as e:
-            print(f"⚠️  Could not get tools from {server_name}: {e}")
+            # Provide cleaner error messages for common MCP issues
+            error_str = str(e).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print(f"ℹ️  {server_name}: No tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print(f"ℹ️  {server_name}: Connection unavailable")
+            else:
+                print(f"ℹ️  {server_name}: Tools unavailable")
             return []
     
     def get_all_aws_tools(self):
@@ -335,7 +361,9 @@ class AgentConfig:
         }
     
     # Model Settings
-    MODEL_TEMPERATURE = 0.3
+    MODEL_TEMPERATURE = 0.3  # Controls randomness in responses (0.3 is fairly deterministic, good for consistent outputs)
+    MAX_TOKENS = 4096        # Model response limit, sufficient for detailed Prometheus troubleshooting and analysis
+    TOP_P = 0.9              # Considering tokens that make up 90% of the probability mass, balances creativity for problem-solving while maintaining technical accuracy
     
     # Memory Settings
     MEMORY_NAME = "PrometheusAgentMemory"
@@ -1632,13 +1660,34 @@ def get_full_tools_list(client):
         return tools
         
     except Exception as e:
-        # print(f"⚠️  MCP tools fetch failed")
         # Fallback to simple list_tools_sync
         try:
             simple_tools = client.list_tools_sync()
-            return simple_tools if hasattr(simple_tools, '__iter__') else [simple_tools] if simple_tools else []
+            
+            # Handle different response formats
+            if isinstance(simple_tools, dict):
+                if 'tools' in simple_tools and simple_tools['tools']:
+                    return simple_tools['tools']
+                else:
+                    print("ℹ️  MCP client returned empty tools dict - no tools available")
+                    return []
+            elif isinstance(simple_tools, list):
+                return simple_tools
+            elif simple_tools is None:
+                print("ℹ️  MCP client returned None - no tools available")
+                return []
+            else:
+                return [simple_tools] if simple_tools else []
+                
         except Exception as fallback_error:
-            # print(f"⚠️  MCP tools unavailable")
+            # Check for common MCP errors and provide cleaner messages
+            error_str = str(fallback_error).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print("ℹ️  No MCP tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print("ℹ️  MCP server connection unavailable")
+            else:
+                print("ℹ️  MCP tools unavailable")
             return []
 
 def create_tools_list():
@@ -1663,7 +1712,14 @@ def create_tools_list():
             tools_list.extend(mcp_tools)
             print(f"✅ Added {len(mcp_tools)} AgentCore Gateway MCP tools")
         except Exception as e:
-            print(f"⚠️  Could not get AgentCore Gateway MCP tools: {e}")
+            # Check for common MCP errors and provide cleaner messages
+            error_str = str(e).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print("ℹ️  No MCP tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print("ℹ️  MCP server connection unavailable")
+            else:
+                print("ℹ️  MCP tools unavailable")
     
     # Add AWS MCP tools if available
     if aws_mcp_manager:
@@ -1672,7 +1728,14 @@ def create_tools_list():
             tools_list.extend(aws_tools)
             print(f"✅ Added {len(aws_tools)} AWS MCP tools")
         except Exception as e:
-            print(f"⚠️  Could not get AWS MCP tools: {e}")
+            # Check for common MCP errors and provide cleaner messages
+            error_str = str(e).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print("ℹ️  No AWS MCP tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print("ℹ️  AWS MCP server connection unavailable")
+            else:
+                print("ℹ️  AWS MCP tools unavailable")
     
     return tools_list
 
@@ -1683,7 +1746,9 @@ def create_devops_agent(model_id: str) -> Agent:
     # Create model with the provided model_id
     model = BedrockModel(
         model_id=model_id, 
-        temperature=AgentConfig.MODEL_TEMPERATURE
+        temperature=AgentConfig.MODEL_TEMPERATURE,
+        max_tokens=AgentConfig.MAX_TOKENS,
+        top_p=AgentConfig.TOP_P
     )
     
     return Agent(
@@ -1702,7 +1767,7 @@ CRITICAL TOOL SELECTION RULES:
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools
 - Use tools ONLY when you need current/specific data
-- MAXIMUM 1 tool call per response
+- MAXIMUM 3 tool call per response
 - Keep responses under 300 words
 - Be direct and actionable
 

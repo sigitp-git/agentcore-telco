@@ -8,7 +8,12 @@ agentcore-telco/
 ├── .env.agents                  # Actual environment (never commit)
 ├── .gitignore                   # Comprehensive ignore rules
 ├── README.md                    # Main project documentation
+├── LICENSE                      # MIT License for the entire project
 ├── test_agents.py               # Comprehensive test suite
+├── docs/                        # Documentation
+│   ├── AGENT_IMPROVEMENTS.md    # Consolidated agent improvements and technical details
+│   ├── DOCUMENTATION_CONSOLIDATION_SUMMARY.md # Documentation consolidation summary
+│   └── telco-architecture-pattern.md # Telco architecture patterns
 ├── eks-agentcore/               # EKS Agent
 ├── vpc-agentcore/               # VPC Agent  
 ├── outposts-agentcore/          # Outposts Agent
@@ -32,9 +37,7 @@ Each agent follows the same standardized structure:
 ├── activate_env.sh              # Environment activation script
 ├── run_streamlit.sh             # Streamlit launcher
 ├── Dockerfile.runtime           # Container configuration
-├── LICENSE                      # License file
 ├── streamlit/                   # Streamlit demo application
-│   ├── README.md
 │   ├── demo_streamlit.py
 │   ├── run_streamlit.sh
 │   └── streamlit_app.py
@@ -87,11 +90,19 @@ class AgentConfig:
     DEFAULT_REGION = 'us-east-1'
     AVAILABLE_MODELS = {...}
     
+    # Model Settings (optimized for infrastructure tasks)
+    MODEL_TEMPERATURE = 0.3  # Deterministic responses
+    MAX_TOKENS = 4096        # Comprehensive analysis
+    TOP_P = 0.9              # Balanced creativity
+    
 class MemoryManager:
     # Memory lifecycle management
     
 class {Agent}MemoryHooks(HookProvider):
     # Memory hooks for context retrieval
+    
+class AWSMCPManager:
+    # AWS MCP tools integration with enhanced error handling
 ```
 
 ### Tool Definitions
@@ -102,11 +113,61 @@ def tool_name(param: type) -> str:
     # Implementation
 ```
 
+### Model Initialization
+```python
+# Create model with optimized settings
+model = BedrockModel(
+    model_id=model_id,
+    temperature=AgentConfig.MODEL_TEMPERATURE,
+    max_tokens=AgentConfig.MAX_TOKENS,
+    top_p=AgentConfig.TOP_P
+)
+```
+
+### Error Handling Patterns
+```python
+# MCP tools error handling
+try:
+    tools = client.list_tools_sync()
+    # Handle different response formats
+    if isinstance(tools, dict):
+        return tools.get('tools', [])
+    elif isinstance(tools, list):
+        return tools
+    return []
+except Exception as e:
+    # Provide clean error messages
+    error_str = str(e).lower()
+    if "validation error" in error_str and "tools" in error_str:
+        print("ℹ️  No MCP tools available")
+    else:
+        print("ℹ️  MCP tools unavailable")
+    return []
+```
+
 ### Import Organization
 1. Standard library imports
 2. Third-party imports (boto3, requests, etc.)
 3. Agent framework imports (strands, bedrock-agentcore)
 4. Local imports (utils, config)
+
+## Documentation
+
+### Primary Documentation (docs/)
+- **README.md**: Main project documentation with comprehensive guide
+- **docs/AGENT_IMPROVEMENTS.md**: Technical details and improvements for all agents
+- **docs/DOCUMENTATION_CONSOLIDATION_SUMMARY.md**: Documentation consolidation summary
+- **docs/telco-architecture-pattern.md**: Telco architecture patterns
+
+### Specialized Documentation (Preserved)
+- **MCP Integration Docs**: awslabs-mcp-lambda/mcp/ directory
+- **A2A Protocol Docs**: agent2agent/ directory
+- **Agent-Specific Docs**: Individual agent directories for runtime-specific documentation
+
+### Documentation Principles
+- **Consolidated Structure**: All general documentation in docs/ directory
+- **No Duplicate Information**: All content consolidated without information loss
+- **Clear Hierarchy**: Primary docs → Specialized docs → Technical details
 
 ## Security Considerations
 

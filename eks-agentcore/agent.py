@@ -195,16 +195,42 @@ class AWSMCPManager:
         """Get tools from an MCP client."""
         try:
             tools = client.list_tools_sync()
-            if tools:
-                # Add server name prefix to tool names for identification
-                for tool in tools:
+            
+            # Handle different response formats
+            if isinstance(tools, dict):
+                # Check if it's a valid tools response with 'tools' field
+                if 'tools' in tools and tools['tools']:
+                    tools_list = tools['tools']
+                else:
+                    print(f"ℹ️  {server_name} returned empty tools dict")
+                    return []
+            elif isinstance(tools, list):
+                tools_list = tools
+            elif tools is None:
+                print(f"ℹ️  {server_name} returned no tools")
+                return []
+            else:
+                print(f"⚠️  {server_name} returned unexpected format: {type(tools)}")
+                return []
+            
+            # Add server name prefix to tool names for identification
+            if tools_list:
+                for tool in tools_list:
                     if hasattr(tool, 'name'):
                         tool._original_name = tool.name
                         tool._server_name = server_name
-                return tools if hasattr(tools, '__iter__') else [tools]
+                return tools_list
             return []
+            
         except Exception as e:
-            print(f"⚠️  Could not get tools from {server_name}: {e}")
+            # Provide cleaner error messages for common MCP issues
+            error_str = str(e).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print(f"ℹ️  {server_name}: No tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print(f"ℹ️  {server_name}: Connection unavailable")
+            else:
+                print(f"ℹ️  {server_name}: Tools unavailable")
             return []
     
     def get_all_aws_tools(self):
@@ -335,7 +361,9 @@ class AgentConfig:
         }
     
     # Model Settings
-    MODEL_TEMPERATURE = 0.3
+    MODEL_TEMPERATURE = 0.3 # Controls randomness in responses (0.3 is fairly deterministic, good for consistent outputs)
+    MAX_TOKENS = 4096  # Model response limit, sufficient for detailed EKS troubleshooting and analysis
+    TOP_P = 0.9        # Considering tokens that make up 90% of the probability mass, balances creativity for problem-solving while maintaining technical accuracy
     
     # Memory Settings
     MEMORY_NAME = "EKSAgentMemory"
@@ -1109,18 +1137,7 @@ class EKSAgentMemoryHooks(HookProvider):
 
 SESSION_ID = str(uuid.uuid4())
 
-def create_agent_hooks(memory_id: str | None) -> list:
-    """Create agent hooks based on memory availability."""
-    if not memory_id:
-        logger.info("Running without memory functionality")
-        return []
-    
-    session_id = str(uuid.uuid4())
-    memory_hooks = DevOpsAgentMemoryHooks(
-        memory_id, memory_client, AgentConfig.DEVOPS_USER_ID, session_id
-    )
-    logger.info("Memory hooks enabled")
-    return [memory_hooks]
+
 
 def get_full_tools_list(client):
     """
@@ -1180,7 +1197,14 @@ def create_tools_list():
             tools_list.extend(mcp_tools)
             print(f"✅ Added {len(mcp_tools)} MCP tools (with pagination support)")
         except Exception as e:
-            print(f"⚠️  Could not get MCP tools: {e}")
+            # Check for common MCP errors and provide cleaner messages
+            error_str = str(e).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print("ℹ️  No MCP tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print("ℹ️  MCP server connection unavailable")
+            else:
+                print("ℹ️  MCP tools unavailable")
     
     return tools_list
 
@@ -1192,20 +1216,32 @@ def get_full_tools_list(mcp_client):
             # Handle different response formats
             if isinstance(tools_result, dict):
                 # If it's a dict, look for 'tools' key
-                if 'tools' in tools_result:
+                if 'tools' in tools_result and tools_result['tools']:
                     return tools_result['tools']
                 else:
-                    print("ℹ️  MCP client returned empty tools dict")
+                    print("ℹ️  MCP client returned empty tools dict - no tools available")
                     return []
             elif isinstance(tools_result, list):
                 # If it's already a list, return it
                 return tools_result
+            elif tools_result is None:
+                print("ℹ️  MCP client returned None - no tools available")
+                return []
             else:
                 print(f"⚠️  Unexpected MCP tools format: {type(tools_result)}")
                 return []
-        return []
+        else:
+            print("ℹ️  No MCP client available")
+            return []
     except Exception as e:
-        print(f"⚠️  Could not get MCP tools: {e}")
+        # Check for common MCP errors and provide cleaner messages
+        error_str = str(e).lower()
+        if "validation error" in error_str and "tools" in error_str:
+            print("ℹ️  No MCP tools available")
+        elif "connection" in error_str or "timeout" in error_str:
+            print("ℹ️  MCP server connection unavailable")
+        else:
+            print("ℹ️  MCP tools unavailable")
         return []
 
 def create_tools_list():
@@ -1254,13 +1290,13 @@ def create_agent_hooks(memory_id: str | None, client: MemoryClient | None):
                 session_id=str(uuid.uuid4())
             )
             print("✅ Memory hooks created successfully")
-            return hooks
+            return [hooks]  # Return as list for Agent constructor
         except Exception as e:
             print(f"⚠️  Could not create memory hooks: {e}")
-            return None
+            return []
     else:
         print("ℹ️  Memory not available - hooks disabled")
-        return None
+        return []
 
 def create_eks_agent(model_id: str) -> Agent:
     """Create and configure the EKS agent."""
@@ -1269,7 +1305,9 @@ def create_eks_agent(model_id: str) -> Agent:
     # Create model with the provided model_id
     model = BedrockModel(
         model_id=model_id, 
-        temperature=AgentConfig.MODEL_TEMPERATURE
+        temperature=AgentConfig.MODEL_TEMPERATURE,
+        max_tokens=AgentConfig.MAX_TOKENS,
+        top_p=AgentConfig.TOP_P
     )
     
     return Agent(
@@ -1288,7 +1326,7 @@ CRITICAL TOOL SELECTION RULES:
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools
 - Use tools ONLY when you need current/specific data
-- MAXIMUM 1 tool call per response
+- MAXIMUM 3 tool call per response
 - Keep responses under 300 words
 - Be direct and actionable
 

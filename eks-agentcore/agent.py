@@ -9,6 +9,8 @@ import uuid
 import sys
 import json
 import requests
+import atexit
+import signal
 
 # Load environment variables from .env.agents file
 try:
@@ -37,6 +39,9 @@ from strands.hooks import AfterInvocationEvent, HookProvider, HookRegistry, Mess
 from strands.models.bedrock import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.stdio import stdio_client, StdioServerParameters
+import subprocess
+import asyncio
 
 # Import AgentCore Memory
 from bedrock_agentcore.memory import MemoryClient
@@ -45,13 +50,253 @@ from bedrock_agentcore.memory.constants import StrategyType
 # Import AgentCore Identity
 from bedrock_agentcore.identity.auth import requires_access_token
 
-sts_client = boto3.client('sts')
+# STS client will be initialized after region setup
+
+class AWSMCPManager:
+    """Manages AWS MCP tools integration."""
+    
+    def __init__(self, config_path: str):
+        self.config_path = config_path
+        self.mcp_clients = {}
+        self.mcp_tools = []
+        self._cleanup_registered = False
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with cleanup."""
+        self.cleanup()
+        
+    def load_aws_mcp_config(self):
+        """Load AWS MCP configuration."""
+        try:
+            if not os.path.exists(self.config_path):
+                print(f"⚠️  AWS MCP config file not found at {self.config_path}")
+                return None
+                
+            with open(self.config_path, 'r') as f:
+                config = json.load(f)
+                return config.get('mcpServers', {})
+                
+        except Exception as e:
+            print(f"❌ Error loading AWS MCP config: {e}")
+            return None
+    
+    def initialize_aws_mcp_clients(self):
+        """Initialize MCP clients for enabled AWS servers with aggressive timeouts."""
+        servers = self.load_aws_mcp_config()
+        if not servers:
+            print("ℹ️  No AWS MCP servers found")
+            return
+        
+        enabled_servers = {name: config for name, config in servers.items() 
+                          if not config.get('disabled', False)}
+        
+        print(f"🔧 Initializing {len(enabled_servers)} AWS MCP servers...")
+        
+        # Known problematic servers that often hang
+        problematic_servers = {
+            'awslabs.prometheus-mcp-server',
+            'aws-knowledge-mcp-server',
+            'awslabs.cloudwatch-mcp-server'
+        }
+        
+        for server_name, server_config in enabled_servers.items():
+            try:
+                # Use shorter timeout for known problematic servers
+                if server_name in problematic_servers:
+                    print(f"   ⚠️  {server_name} is known to be slow, using shorter timeout...")
+                
+                self._initialize_single_mcp_client(server_name, server_config)
+            except Exception as e:
+                print(f"⚠️  Failed to initialize {server_name}: {e}")
+    
+    def _initialize_single_mcp_client(self, server_name: str, server_config: dict):
+        """Initialize a single MCP client with timeout."""
+        command = server_config.get('command', '')
+        args = server_config.get('args', [])
+        env = server_config.get('env', {})
+        
+        if not command:
+            print(f"⚠️  No command specified for {server_name}")
+            return
+        
+        import threading
+        import time
+        
+        def init_client_worker():
+            """Worker function to initialize client."""
+            try:
+                # Create environment with current env + server env
+                full_env = os.environ.copy()
+                
+                # Ensure AWS region is set for all AWS MCP servers
+                if 'aws' in server_name.lower() or any('aws' in arg.lower() for arg in args):
+                    full_env.setdefault('AWS_DEFAULT_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+                    full_env.setdefault('AWS_REGION', os.environ.get('AWS_REGION', 'us-east-1'))
+                
+                # Apply server-specific environment variables
+                full_env.update(env)
+                
+                # Add additional logging suppression for all MCP servers
+                full_env.setdefault('PYTHONWARNINGS', 'ignore')
+                full_env.setdefault('LOGURU_LEVEL', 'ERROR')
+                full_env.setdefault('LOG_LEVEL', 'ERROR')
+                
+                # Create MCP client using stdio
+                server_params = StdioServerParameters(
+                    command=command,
+                    args=args,
+                    env=full_env
+                )
+                client = MCPClient(
+                    lambda: stdio_client(server_params)
+                )
+                
+                print(f"   • Starting {server_name}...")
+                
+                # Start the client (this can hang)
+                client.start()
+                
+                # Get tools from this client
+                tools = self._get_tools_from_client(client, server_name)
+                
+                self.mcp_clients[server_name] = client
+                self.mcp_tools.extend(tools)
+                
+                print(f"✅ Initialized {server_name} with {len(tools)} tools")
+                return True
+                
+            except Exception as e:
+                print(f"⚠️  Failed to start {server_name}: {e}")
+                return False
+        
+        # Use different timeouts based on server type
+        problematic_servers = {
+            'awslabs.prometheus-mcp-server',
+            'aws-knowledge-mcp-server', 
+            'awslabs.cloudwatch-mcp-server'
+        }
+        
+        timeout = 2.0 if server_name in problematic_servers else 5.0
+        
+        # Run initialization with timeout
+        init_thread = threading.Thread(target=init_client_worker, daemon=True)
+        init_thread.start()
+        init_thread.join(timeout=timeout)
+        
+        if init_thread.is_alive():
+            print(f"⚠️  {server_name} initialization timed out after {timeout}s, skipping...")
+            return
+    
+    def _get_tools_from_client(self, client, server_name: str):
+        """Get tools from an MCP client."""
+        try:
+            tools = client.list_tools_sync()
+            if tools:
+                # Add server name prefix to tool names for identification
+                for tool in tools:
+                    if hasattr(tool, 'name'):
+                        tool._original_name = tool.name
+                        tool._server_name = server_name
+                return tools if hasattr(tools, '__iter__') else [tools]
+            return []
+        except Exception as e:
+            print(f"⚠️  Could not get tools from {server_name}: {e}")
+            return []
+    
+    def get_all_aws_tools(self):
+        """Get all tools from AWS MCP clients."""
+        return self.mcp_tools
+    
+    def cleanup(self):
+        """Cleanup MCP clients and stdio resources with timeout."""
+        if self._cleanup_registered:
+            return  # Already cleaned up
+        
+        self._cleanup_registered = True
+        print(f"🧹 Cleaning up {len(self.mcp_clients)} MCP clients...")
+        
+        import time
+        import threading
+        
+        def cleanup_client_with_timeout(server_name, client, timeout=2.0):
+            """Cleanup a single client with timeout."""
+            def cleanup_worker():
+                try:
+                    print(f"   • Stopping {server_name}...")
+                    
+                    # For stdio clients, try to terminate the underlying process first
+                    process = None
+                    try:
+                        if hasattr(client, '_client_session') and hasattr(client._client_session, '_process'):
+                            process = client._client_session._process
+                        elif hasattr(client, '_session') and hasattr(client._session, '_process'):
+                            process = client._session._process
+                        elif hasattr(client, '_process'):
+                            process = client._process
+                        
+                        if process and hasattr(process, 'poll') and process.poll() is None:
+                            print(f"   🔄 Terminating stdio process for {server_name}...")
+                            process.terminate()
+                            time.sleep(0.1)  # Very brief wait
+                            if process.poll() is None:
+                                process.kill()
+                            print(f"   ✅ {server_name} stdio process terminated")
+                        elif process:
+                            print(f"   ℹ️  {server_name} process already terminated")
+                    except Exception as process_error:
+                        print(f"   ⚠️  Process termination failed for {server_name}: {process_error}")
+                    
+                    # Try client cleanup methods (but don't wait long)
+                    try:
+                        if hasattr(client, 'stop'):
+                            client.stop(None, None, None)
+                        elif hasattr(client, '__exit__'):
+                            client.__exit__(None, None, None)
+                        elif hasattr(client, 'close'):
+                            client.close()
+                        print(f"   ✅ {server_name} stopped successfully")
+                    except Exception as cleanup_error:
+                        print(f"   ⚠️  Client cleanup failed for {server_name}: {cleanup_error}")
+                            
+                except Exception as e:
+                    print(f"   ❌ Complete cleanup failed for {server_name}: {e}")
+            
+            # Run cleanup in a thread with timeout
+            cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+            cleanup_thread.start()
+            cleanup_thread.join(timeout=timeout)
+            
+            if cleanup_thread.is_alive():
+                print(f"   ⚠️  {server_name} cleanup timed out after {timeout}s")
+                return False
+            return True
+        
+        # Cleanup each client with timeout
+        for server_name, client in list(self.mcp_clients.items()):
+            cleanup_client_with_timeout(server_name, client)
+        
+        # Clear the clients dictionary
+        self.mcp_clients.clear()
+        self.mcp_tools.clear()
+        print("✅ MCP cleanup completed")
 
 class AgentConfig:
     """Configuration settings for the EKS Agent."""
     
     # AWS Settings
     DEFAULT_REGION = 'us-east-1'
+    
+    # MCP Configuration
+    ENABLE_MCP_CONFIG = True  # Toggle to enable/disable MCP config loading
+    MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'
+    
+    # AWS MCP Configuration
+    ENABLE_AWS_MCP = True  # Toggle to enable/disable AWS MCP integration
+    AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'  # Path to AWS MCP config file
     
     # Available Models
     AVAILABLE_MODELS = {
@@ -93,11 +338,11 @@ class AgentConfig:
     MODEL_TEMPERATURE = 0.3
     
     # Memory Settings
-    MEMORY_NAME = "DevOpsAgentMemory"
-    SSM_MEMORY_ID_PATH = "/app/devopsagent/agentcore/memory_id"
+    MEMORY_NAME = "EKSAgentMemory"
+    SSM_MEMORY_ID_PATH = "/app/eksagent/agentcore/memory_id"
     MEMORY_EXPIRY_DAYS = 90
     CONTEXT_RETRIEVAL_TOP_K = 3
-    DEVOPS_USER_ID = "devops_001"
+    DEVOPS_USER_ID = "eks_001"
     
     # Search Settings
     SEARCH_REGION = "us-en"
@@ -105,8 +350,72 @@ class AgentConfig:
     @classmethod
     def setup_aws_region(cls):
         """Setup AWS region configuration."""
+        # Set environment variables for AWS region
         os.environ['AWS_DEFAULT_REGION'] = cls.DEFAULT_REGION
-        return Session().region_name
+        os.environ['AWS_REGION'] = cls.DEFAULT_REGION
+        
+        # Create a new session to ensure region is properly set
+        session = Session()
+        actual_region = session.region_name or cls.DEFAULT_REGION
+        
+        # Verify the region is set correctly
+        if actual_region != cls.DEFAULT_REGION:
+            print(f"⚠️  Region mismatch: expected {cls.DEFAULT_REGION}, got {actual_region}")
+            # Force the region in the session
+            session = Session(region_name=cls.DEFAULT_REGION)
+            actual_region = cls.DEFAULT_REGION
+        
+        print(f"🌍 AWS region configured: {actual_region}")
+        return actual_region
+    
+    @classmethod
+    def load_mcp_config(cls):
+        """Load MCP configuration from the specified file path."""
+        if not cls.ENABLE_MCP_CONFIG:
+            return None
+            
+        try:
+            if not os.path.exists(cls.MCP_CONFIG_PATH):
+                print(f"⚠️  MCP config file not found")
+                return None
+                
+            with open(cls.MCP_CONFIG_PATH, 'r') as f:
+                mcp_config = json.load(f)
+                return mcp_config
+                
+        except json.JSONDecodeError as e:
+            print(f"❌ Invalid JSON in MCP config file: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ Error loading MCP config: {e}")
+            return None
+    
+    @classmethod
+    def get_mcp_servers(cls):
+        """Get MCP servers configuration."""
+        mcp_config = cls.load_mcp_config()
+        if mcp_config and 'mcpServers' in mcp_config:
+            return mcp_config['mcpServers']
+        return {}
+    
+    @classmethod
+    def is_mcp_server_enabled(cls, server_name: str):
+        """Check if a specific MCP server is enabled."""
+        servers = cls.get_mcp_servers()
+        if server_name in servers:
+            return not servers[server_name].get('disabled', False)
+        return False
+    
+    @classmethod
+    def toggle_mcp_config(cls, enabled: bool = None):
+        """Toggle MCP configuration loading on/off."""
+        if enabled is None:
+            cls.ENABLE_MCP_CONFIG = not cls.ENABLE_MCP_CONFIG
+        else:
+            cls.ENABLE_MCP_CONFIG = enabled
+        
+        status = "enabled" if cls.ENABLE_MCP_CONFIG else "disabled"
+        return cls.ENABLE_MCP_CONFIG
 
 def select_model_interactive():
     """Interactive model selection for CLI usage."""
@@ -139,26 +448,39 @@ def select_model_interactive():
     except (ValueError, KeyboardInterrupt):
         print(f"✅ Using current model: {models[AgentConfig.SELECTED_MODEL]}")
 
-# Check for command line arguments
-if len(sys.argv) > 1:
-    if sys.argv[1] == '--select-model':
-        select_model_interactive()
-        sys.exit(0)
-    elif sys.argv[1] in ['--help', '-h']:
-        print("\n🤖 AWS EKS Agent - Usage")
-        print("=" * 40)
-        print("python3 agent.py                 # Run agent with current model")
-        print("python3 agent.py --select-model  # Interactive model selection")
-        print("python3 select_model.py          # Standalone model selector")
-        print("\nAvailable Models:")
-        for key, desc in AgentConfig.list_models().items():
-            current = " (CURRENT)" if key == AgentConfig.SELECTED_MODEL else ""
-            print(f"  • {desc}{current}")
-        print()
-        sys.exit(0)
+def handle_command_line_args():
+    """Handle command line arguments - only called when running as main script."""
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--select-model':
+            select_model_interactive()
+            sys.exit(0)
+        elif sys.argv[1] in ['--help', '-h']:
+            print("\n🤖 AWS EKS Agent - Usage")
+            print("=" * 40)
+            print("python3 agent.py                 # Run agent with current model")
+            print("python3 agent.py --select-model  # Interactive model selection")
+            print("python3 select_model.py          # Standalone model selector")
+            print("\nAvailable Models:")
+            for key, desc in AgentConfig.list_models().items():
+                current = " (CURRENT)" if key == AgentConfig.SELECTED_MODEL else ""
+                print(f"  • {desc}{current}")
+            print("\nMCP Configuration Tools:")
+            print("  • list_mcp_server_names()       # Quick list of server names")
+            print("  • list_mcp_servers_from_config() # Detailed server information")
+            print("  • manage_mcp_config()           # Manage MCP configuration")
+            print("  • show_available_mcp_servers()  # Show servers with details")
+            print()
+            sys.exit(0)
 
-# Initialize configuration
-REGION = AgentConfig.setup_aws_region()
+# Global variables that will be initialized in main()
+REGION = None
+sts_client = None
+gateway = None
+gateway_id = None
+mcp_client = None
+aws_mcp_manager = None
+memory_id = None
+memory_client = None
 
 def validate_discovery_url(url):
     """Validate that the discovery URL is accessible and returns valid OIDC configuration."""
@@ -180,9 +502,9 @@ def validate_discovery_url(url):
 def validate_gateway_configuration():
     """Validate gateway configuration parameters before creation."""
     required_params = {
-        "/app/devopsagent/agentcore/machine_client_id": "Machine Client ID",
-        "/app/devopsagent/agentcore/cognito_discovery_url": "Cognito Discovery URL",
-        "/app/devopsagent/agentcore/gateway_iam_role": "Gateway IAM Role"
+        "/app/eksagent/agentcore/machine_client_id": "Machine Client ID",
+        "/app/eksagent/agentcore/cognito_discovery_url": "Cognito Discovery URL",
+        "/app/eksagent/agentcore/gateway_iam_role": "Gateway IAM Role"
     }
     
     missing_params = []
@@ -221,14 +543,18 @@ def validate_gateway_configuration():
     
     return True
 
-def use_manual_gateway():
+def use_manual_gateway(region=None):
     """Use manually created gateway from AWS Management Console."""
     # Get gateway ID from environment variable
     manual_gateway_id = os.getenv("EKS_AGENT_GATEWAY_ID", "eks-agent-agentcore-gw-7uxdeftskt")
     
     print(f"🔍 Using manually created gateway: {manual_gateway_id}")
     
-    gateway_client = boto3.client("bedrock-agentcore-control", region_name=REGION)
+    # Use provided region or fall back to global REGION or default
+    if region is None:
+        region = globals().get('REGION', 'us-east-1')
+    
+    gateway_client = boto3.client("bedrock-agentcore-control", region_name=region)
     
     try:
         # Get gateway details
@@ -241,7 +567,7 @@ def use_manual_gateway():
         }
         
         # Store gateway ID in SSM for reference
-        put_ssm_parameter("/app/devopsagent/agentcore/gateway_id", manual_gateway_id)
+        put_ssm_parameter("/app/eksagent/agentcore/gateway_id", manual_gateway_id)
         
         print(f"✅ Successfully connected to manual gateway: {manual_gateway_id}")
         print(f"   Gateway URL: {gateway['gateway_url']}")
@@ -326,8 +652,7 @@ def try_existing_gateway(gateway_client):
     print("🔄 Continuing without gateway functionality...")
     return None, None
 
-# Initialize gateway - using manually created gateway
-gateway, gateway_id = use_manual_gateway()
+# Gateway initialization will be done in main()
 
 # Using the AgentCore Gateway for MCP server (only if gateway is available)
 def get_token(client_id: str, client_secret: str, scope_string: str = None, url: str = None) -> dict:
@@ -356,57 +681,73 @@ def get_token(client_id: str, client_secret: str, scope_string: str = None, url:
     except requests.exceptions.RequestException as err:
         return {"error": str(err)}
 
-# Initialize MCP client only if gateway is available
-mcp_client = None
-if gateway and gateway_id:
+# MCP client initialization will be done in main()
+
+# AWS MCP Manager initialization will be done in main()
+
+# Global cleanup state
+_cleanup_done = False
+
+# Define cleanup functions
+def cleanup_all_resources():
+    """Cleanup all MCP resources and connections with timeout."""
+    global _cleanup_done
+    
+    if _cleanup_done:
+        return  # Already cleaned up
+    
+    _cleanup_done = True
+    print("\n🧹 Cleaning up resources...")
+    
+    import threading
+    import time
+    import os
+    
+    def cleanup_with_timeout():
+        """Perform cleanup operations."""
+        try:
+            # Cleanup AWS MCP clients
+            if aws_mcp_manager:
+                print("🔄 Cleaning up AWS MCP clients...")
+                aws_mcp_manager.cleanup()
+            
+            # Cleanup main MCP client (gateway connection)
+            if mcp_client:
+                try:
+                    print("🔄 Cleaning up main MCP client...")
+                    if hasattr(mcp_client, 'stop'):
+                        mcp_client.stop(None, None, None)
+                    elif hasattr(mcp_client, '__exit__'):
+                        mcp_client.__exit__(None, None, None)
+                    elif hasattr(mcp_client, 'close'):
+                        mcp_client.close()
+                    print("✅ Main MCP client cleanup completed")
+                except Exception as e:
+                    print(f"⚠️  Main MCP client cleanup failed: {e}")
+        except Exception as e:
+            print(f"⚠️  Cleanup error: {e}")
+    
+    # Run cleanup with timeout to prevent hanging
+    cleanup_thread = threading.Thread(target=cleanup_with_timeout, daemon=True)
+    cleanup_thread.start()
+    cleanup_thread.join(timeout=3.0)  # 3 second timeout
+    
+    if cleanup_thread.is_alive():
+        print("⚠️  Cleanup timed out, forcing exit...")
+        # Force exit if cleanup hangs
+        os._exit(0)
+    else:
+        print("✅ All resources cleaned up")
+
+def emergency_cleanup():
+    """Emergency cleanup function for unexpected exits."""
     try:
-        print(f"🔗 Setting up MCP client for gateway: {gateway_id}")
-        
-        gateway_access_token = get_token(
-            get_ssm_parameter("/app/eksagent/agentcore/machine_client_id"),
-            get_cognito_client_secret(),
-            get_ssm_parameter("/app/eksagent/agentcore/cognito_auth_scope"),
-            get_ssm_parameter("/app/eksagent/agentcore/cognito_token_url")
-        )
-        
-        print(f"🔍 Debug - Token response: {gateway_access_token}")
-        
-        # Check if we got a valid token
-        if 'error' in gateway_access_token:
-            print(f"❌ Token error: {gateway_access_token['error']}")
-            raise Exception(f"Failed to get access token: {gateway_access_token['error']}")
-        
-        if 'access_token' not in gateway_access_token:
-            print(f"❌ No access_token in response. Available keys: {list(gateway_access_token.keys())}")
-            raise Exception("No access_token in authentication response")
+        cleanup_all_resources()
+    except:
+        pass  # Ignore errors during emergency cleanup
 
-        print(f"Gateway Endpoint - MCP URL: {gateway['gateway_url']}")
-
-        # Set up MCP client
-        mcp_client = MCPClient(
-            lambda: streamablehttp_client(
-                gateway['gateway_url'],
-                headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
-            )
-        )
-        print("✅ MCP client configured successfully")
-        
-    except Exception as e:
-        print(f"⚠️  MCP client setup failed: {e}")
-        print("🔄 Continuing without MCP client functionality...")
-        mcp_client = None
-else:
-    print("ℹ️  No gateway available - MCP client functionality disabled")
-
-# Initialize MCP client if available
-if mcp_client:
-    try:
-        mcp_client.start()
-        print("✅ MCP client started successfully")
-    except Exception as e:
-        print(f"⚠️  MCP client start failed: {str(e)}")
-        print("🔄 Continuing without MCP client functionality...")
-        mcp_client = None
+# Register emergency cleanup for unexpected exits
+atexit.register(emergency_cleanup)
 
 # Configure logging
 logging.getLogger("strands").setLevel(logging.INFO)
@@ -507,20 +848,7 @@ def _format_search_results(results: list) -> str:
     return "\n".join(formatted)
 
 
-# Create a Bedrock model instance with temperature control
-# Temperature 0.3: Focused and consistent responses, ideal for technical accuracy
-# Adjust temperature: 0.1-0.3 (very focused), 0.4-0.7 (balanced), 0.8-1.0 (creative)
-current_model_id = AgentConfig.get_model_id()
-print(f"🤖 Using MODEL_ID: {current_model_id}")
-print(f"📝 Model Description: {AgentConfig.list_models()[AgentConfig.SELECTED_MODEL]}")
-model = BedrockModel(
-    model_id=current_model_id, 
-    temperature=AgentConfig.MODEL_TEMPERATURE
-)
-
-# AgentCore Memory section
-memory_client = MemoryClient(region_name=REGION)
-memory_name = AgentConfig.MEMORY_NAME
+# Model and memory initialization will be done in main()
 
 
 
@@ -619,16 +947,16 @@ class MemoryManager:
         return [
             {
                 StrategyType.USER_PREFERENCE.value: {
-                    "name": "DevOpsPreferences",
-                    "description": "Captures DevOps preferences and behavior",
-                    "namespaces": ["agent/devops/{actorId}/preferences"],
+                    "name": "EKSPreferences",
+                    "description": "Captures EKS preferences and behavior",
+                    "namespaces": ["agent/eks/{actorId}/preferences"],
                 }
             },
             {
                 StrategyType.SEMANTIC.value: {
-                    "name": "DevOpsAgentSemantic",
+                    "name": "EKSAgentSemantic",
                     "description": "Stores facts from conversations",
-                    "namespaces": ["agent/devops/{actorId}/semantic"],
+                    "namespaces": ["agent/eks/{actorId}/semantic"],
                 }
             },
         ]
@@ -641,15 +969,16 @@ class MemoryManager:
         except Exception as e:
             logger.warning(f"Could not save memory ID to SSM: {e}")
 
-def create_or_get_memory_resource():
+def create_or_get_memory_resource(client: MemoryClient, memory_name: str):
     """Factory function for memory resource creation."""
-    memory_manager = MemoryManager(memory_client, memory_name)
+    memory_manager = MemoryManager(client, memory_name)
     return memory_manager.get_or_create_memory()
 
-def initialize_memory() -> str | None:
+def initialize_memory(client: MemoryClient) -> str | None:
     """Initialize memory with proper error handling."""
     try:
-        memory_id = create_or_get_memory_resource()
+        memory_name = AgentConfig.MEMORY_NAME
+        memory_id = create_or_get_memory_resource(client, memory_name)
         if memory_id:
             logger.info(f"AgentCore Memory ready with ID: {memory_id}")
             return memory_id
@@ -675,9 +1004,9 @@ def _log_memory_initialization_error():
     for msg in error_messages:
         logger.warning(msg)
 
-memory_id = initialize_memory()
+# Memory initialization will be done in main()
 
-class DevOpsAgentMemoryHooks(HookProvider):
+class EKSAgentMemoryHooks(HookProvider):
     """Memory hooks for EKS Agent"""
 
     def __init__(
@@ -692,8 +1021,8 @@ class DevOpsAgentMemoryHooks(HookProvider):
             for i in self.client.get_memory_strategies(self.memory_id)
         }
 
-    def retrieve_devops_context(self, event: MessageAddedEvent):
-        """Retrieve DevOps context before processing query"""
+    def retrieve_eks_context(self, event: MessageAddedEvent):
+        """Retrieve EKS context before processing query"""
         messages = event.agent.messages
         if (
             messages[-1]["role"] == "user"
@@ -705,7 +1034,7 @@ class DevOpsAgentMemoryHooks(HookProvider):
                 all_context = []
 
                 for context_type, namespace in self.namespaces.items():
-                    # *** AGENTCORE MEMORY USAGE *** - Retrieve DevOps context from each namespace
+                    # *** AGENTCORE MEMORY USAGE *** - Retrieve EKS context from each namespace
                     memories = self.client.retrieve_memories(
                         memory_id=self.memory_id,
                         namespace=namespace.format(actorId=self.actor_id),
@@ -723,19 +1052,19 @@ class DevOpsAgentMemoryHooks(HookProvider):
                                         f"[{context_type.upper()}] {text}"
                                     )
 
-                # Inject DevOps context into the query
+                # Inject EKS context into the query
                 if all_context:
                     context_text = "\n".join(all_context)
                     original_text = messages[-1]["content"][0]["text"]
                     messages[-1]["content"][0][
                         "text"
-                    ] = f"DevOps Context:\n{context_text}\n\n{original_text}"
-                    logger.info(f"Retrieved {len(all_context)} DevOps context items")
+                    ] = f"EKS Context:\n{context_text}\n\n{original_text}"
+                    logger.info(f"Retrieved {len(all_context)} EKS context items")
 
             except Exception as e:
-                logger.error(f"Failed to retrieve DevOps context: {e}")
+                logger.error(f"Failed to retrieve EKS context: {e}")
 
-    def save_devops_interaction(self, event: AfterInvocationEvent):
+    def save_eks_interaction(self, event: AfterInvocationEvent):
         """Save EKS Agent interaction after agent response"""
         try:
             messages = event.agent.messages
@@ -756,7 +1085,7 @@ class DevOpsAgentMemoryHooks(HookProvider):
                         break
 
                 if user_query and agent_response:
-                    # *** AGENTCORE MEMORY USAGE *** - Save the DevOps interaction
+                    # *** AGENTCORE MEMORY USAGE *** - Save the EKS interaction
                     # Note: AgentCore Memory requires "ASSISTANT" role, not "AGENT"
                     self.client.create_event(
                         memory_id=self.memory_id,
@@ -767,15 +1096,15 @@ class DevOpsAgentMemoryHooks(HookProvider):
                             (agent_response, "ASSISTANT"),
                         ],
                     )
-                    logger.info("Saved DevOps interaction to memory")
+                    logger.info("Saved EKS interaction to memory")
 
         except Exception as e:
-            logger.error(f"Failed to save DevOps interaction: {e}")
+            logger.error(f"Failed to save EKS interaction: {e}")
 
     def register_hooks(self, registry: HookRegistry) -> None:
         """Register EKS Agent memory hooks"""
-        registry.add_callback(MessageAddedEvent, self.retrieve_devops_context)
-        registry.add_callback(AfterInvocationEvent, self.save_devops_interaction)
+        registry.add_callback(MessageAddedEvent, self.retrieve_eks_context)
+        registry.add_callback(AfterInvocationEvent, self.save_eks_interaction)
         logger.info("EKS Agent memory hooks registered")
 
 SESSION_ID = str(uuid.uuid4())
@@ -855,14 +1184,106 @@ def create_tools_list():
     
     return tools_list
 
-def create_devops_agent() -> Agent:
+def get_full_tools_list(mcp_client):
+    """Get all available tools from MCP client."""
+    try:
+        if mcp_client:
+            tools_result = mcp_client.list_tools_sync()
+            # Handle different response formats
+            if isinstance(tools_result, dict):
+                # If it's a dict, look for 'tools' key
+                if 'tools' in tools_result:
+                    return tools_result['tools']
+                else:
+                    print("ℹ️  MCP client returned empty tools dict")
+                    return []
+            elif isinstance(tools_result, list):
+                # If it's already a list, return it
+                return tools_result
+            else:
+                print(f"⚠️  Unexpected MCP tools format: {type(tools_result)}")
+                return []
+        return []
+    except Exception as e:
+        print(f"⚠️  Could not get MCP tools: {e}")
+        return []
+
+def create_tools_list():
+    """Create the complete list of tools for the agent."""
+    # Start with local tools
+    tools_list = [
+        websearch,
+        list_mcp_tools,
+    ]
+    
+    # Add MCP tools if available
+    if mcp_client:
+        try:
+            mcp_tools = get_full_tools_list(mcp_client)
+            if mcp_tools:
+                tools_list.extend(mcp_tools)
+                print(f"✅ Added {len(mcp_tools)} MCP tools to agent")
+            else:
+                print("ℹ️  No MCP tools available")
+        except Exception as e:
+            print(f"⚠️  Could not add MCP tools: {e}")
+    
+    # Add AWS MCP tools if available
+    if aws_mcp_manager:
+        try:
+            aws_tools = aws_mcp_manager.get_all_aws_tools()
+            if aws_tools:
+                tools_list.extend(aws_tools)
+                print(f"✅ Added {len(aws_tools)} AWS MCP tools to agent")
+            else:
+                print("ℹ️  No AWS MCP tools available")
+        except Exception as e:
+            print(f"⚠️  Could not add AWS MCP tools: {e}")
+    
+    print(f"🔧 Total tools available: {len(tools_list)}")
+    return tools_list
+
+def create_agent_hooks(memory_id: str | None, client: MemoryClient | None):
+    """Create agent hooks for memory integration."""
+    if memory_id and client:
+        try:
+            hooks = EKSAgentMemoryHooks(
+                memory_id=memory_id,
+                client=client,
+                actor_id=AgentConfig.DEVOPS_USER_ID,
+                session_id=str(uuid.uuid4())
+            )
+            print("✅ Memory hooks created successfully")
+            return hooks
+        except Exception as e:
+            print(f"⚠️  Could not create memory hooks: {e}")
+            return None
+    else:
+        print("ℹ️  Memory not available - hooks disabled")
+        return None
+
+def create_eks_agent(model_id: str) -> Agent:
     """Create and configure the EKS agent."""
-    hooks = create_agent_hooks(memory_id)
+    hooks = create_agent_hooks(memory_id, memory_client)
+    
+    # Create model with the provided model_id
+    model = BedrockModel(
+        model_id=model_id, 
+        temperature=AgentConfig.MODEL_TEMPERATURE
+    )
     
     return Agent(
         model=model,
         hooks=hooks,
-        system_prompt="""You are AWS EKS agent. Help with AWS infrastructure and operations.
+        system_prompt="""You are AWS EKS agent. Help with EKS cluster management, Kubernetes operations, and AWS infrastructure.
+
+CRITICAL TOOL SELECTION RULES:
+- For "list EKS clusters": Use `list_eks_clusters()` or `list_resources` with resource_type="AWS::EKS::Cluster"
+- For "list pods/services/etc": Use `list_k8s_resources` with cluster_name (requires specific cluster)
+- For AWS account resources: Use CCAPI tools (list_resources, get_resource)
+- For Kubernetes resources within clusters: Use EKS MCP tools (list_k8s_resources, get_pod_logs)
+- NEVER use `list_k8s_resources` without a valid cluster_name parameter
+- If unsure about tool selection, use `aws_resource_guidance()` or `eks_tool_guidance()`
 
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools
@@ -941,10 +1362,10 @@ def setup_gateway_parameters():
     
     # Check current parameters
     params_to_check = {
-        "/app/devopsagent/agentcore/machine_client_id": "Cognito Machine Client ID",
-        "/app/devopsagent/agentcore/cognito_discovery_url": "OIDC Discovery URL",
-        "/app/devopsagent/agentcore/gateway_iam_role": "Gateway IAM Role ARN",
-        "/app/devopsagent/agentcore/gateway_id": "Gateway ID (Auto-managed)"
+        "/app/eksagent/agentcore/machine_client_id": "Cognito Machine Client ID",
+        "/app/eksagent/agentcore/cognito_discovery_url": "OIDC Discovery URL",
+        "/app/eksagent/agentcore/gateway_iam_role": "Gateway IAM Role ARN",
+        "/app/eksagent/agentcore/gateway_id": "Gateway ID (Auto-managed)"
     }
     
     for param_path, description in params_to_check.items():
@@ -972,18 +1393,149 @@ def setup_gateway_parameters():
     print(f"\n🚀 Agent Status:")
     print(f"   The agent works with full functionality including gateway support!")
 
+def initialize_agent():
+    """Initialize all agent components."""
+    global REGION, sts_client, gateway, gateway_id, mcp_client, aws_mcp_manager, memory_id, memory_client
+    
+    # Initialize configuration
+    REGION = AgentConfig.setup_aws_region()
+    
+    # Initialize AWS clients with proper region
+    sts_client = boto3.client('sts', region_name=REGION)
+    
+    # Initialize MCP configuration
+    print(f"🔧 MCP Configuration: {'enabled' if AgentConfig.ENABLE_MCP_CONFIG else 'disabled'}")
+    
+    if AgentConfig.ENABLE_MCP_CONFIG:
+        mcp_servers = AgentConfig.get_mcp_servers()
+        if mcp_servers:
+            enabled_servers = [name for name, config in mcp_servers.items() if not config.get('disabled', False)]
+            print(f"   • {len(enabled_servers)} MCP servers available")
+        else:
+            print(f"   • No MCP servers found")
+    
+    # Initialize gateway - using manually created gateway
+    gateway, gateway_id = use_manual_gateway(REGION)
+    
+    # Initialize MCP client only if gateway is available
+    mcp_client = None
+    if gateway and gateway_id:
+        try:
+            print(f"🔗 Setting up MCP client for gateway: {gateway_id}")
+            
+            gateway_access_token = get_token(
+                get_ssm_parameter("/app/eksagent/agentcore/machine_client_id"),
+                get_cognito_client_secret(),
+                get_ssm_parameter("/app/eksagent/agentcore/cognito_auth_scope"),
+                get_ssm_parameter("/app/eksagent/agentcore/cognito_token_url")
+            )
+            
+            print(f"🔍 Debug - Token response: {gateway_access_token}")
+            
+            # Check if we got a valid token
+            if 'error' in gateway_access_token:
+                print(f"❌ Token error: {gateway_access_token['error']}")
+                raise Exception(f"Failed to get access token: {gateway_access_token['error']}")
+            
+            if 'access_token' not in gateway_access_token:
+                print(f"❌ No access_token in response. Available keys: {list(gateway_access_token.keys())}")
+                raise Exception("No access_token in authentication response")
+
+            print(f"Gateway Endpoint - MCP URL: {gateway['gateway_url']}")
+
+            # Set up MCP client
+            mcp_client = MCPClient(
+                lambda: streamablehttp_client(
+                    gateway['gateway_url'],
+                    headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
+                )
+            )
+            print("✅ MCP client configured successfully")
+            
+        except Exception as e:
+            print(f"⚠️  MCP client setup failed: {e}")
+            print("🔄 Continuing without MCP client functionality...")
+            mcp_client = None
+    else:
+        print("ℹ️  No gateway available - MCP client functionality disabled")
+
+    # Initialize MCP client if available
+    if mcp_client:
+        try:
+            mcp_client.start()
+            print("✅ MCP client started successfully")
+        except Exception as e:
+            print(f"⚠️  MCP client start failed: {str(e)}")
+            print("🔄 Continuing without MCP client functionality...")
+            mcp_client = None
+
+    # Initialize AWS MCP Manager if enabled
+    aws_mcp_manager = None
+    if AgentConfig.ENABLE_AWS_MCP and AgentConfig.AWS_MCP_CONFIG_PATH:
+        try:
+            print("🔧 Initializing AWS MCP Manager...")
+            aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
+            aws_mcp_manager.initialize_aws_mcp_clients()
+        except Exception as e:
+            print(f"⚠️  AWS MCP Manager initialization failed: {e}")
+            aws_mcp_manager = None
+
+    # Initialize memory
+    memory_client = MemoryClient(region_name=REGION)
+    memory_id = initialize_memory(memory_client)
+    
+    # Return the current model ID for agent creation
+    current_model_id = AgentConfig.get_model_id()
+    print(f"🤖 Using MODEL_ID: {current_model_id}")
+    print(f"📝 Model Description: {AgentConfig.list_models()[AgentConfig.SELECTED_MODEL]}")
+    return current_model_id
+
 def main():
     """Main execution function."""
     import sys
+    import signal
+    
+    # Handle command line arguments first
+    handle_command_line_args()
+    
+    # Register signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        print(f"\n🛑 Received signal {signum}, shutting down gracefully...")
+        cleanup_all_resources()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
     
     # Check for setup command
     if len(sys.argv) > 1 and sys.argv[1] == "setup":
         setup_gateway_parameters()
         return
     
-    agent = create_devops_agent()
-    conversation_manager = ConversationManager(agent)
-    conversation_manager.start_conversation()
+    try:
+        # Initialize all components
+        current_model_id = initialize_agent()
+        
+        # Create agent with initialized components
+        agent = create_eks_agent(current_model_id)
+        conversation_manager = ConversationManager(agent)
+        conversation_manager.start_conversation()
+        
+        # If we reach here, user exited normally
+        print("🔄 Normal exit, cleaning up...")
+        
+    except KeyboardInterrupt:
+        print("\n🛑 Interrupted by user")
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+    finally:
+        # Only cleanup if not already done by signal handler
+        if not _cleanup_done:
+            cleanup_all_resources()
+        
+        # Force exit to prevent hanging
+        import os
+        os._exit(0)
 
 if __name__ == "__main__":
     main()

@@ -451,6 +451,36 @@ All agents are optimized with the following model settings:
 - **Max Tokens: 4096** - Sufficient for detailed analysis and comprehensive responses
 - **Top-P: 0.9** - Balanced creativity for problem-solving while maintaining technical accuracy
 
+NOTE:
+> Top-p and top-k are two different sampling strategies used in Amazon Bedrock models to control text generation:
+
+Top-k sampling:
+• Limits the model to consider only the k most likely next tokens
+• Example: If top-k = 50, only the 50 most probable tokens are considered
+• Creates a fixed-size pool of candidates regardless of their probability distribution
+• Can include very low-probability tokens if they're in the top k
+
+Top-p sampling (nucleus sampling):
+• Selects tokens from the smallest set whose cumulative probability exceeds the threshold p
+• Example: If top-p = 0.9, tokens are selected until their combined probability reaches 90%
+• Creates a dynamic pool size based on probability distribution
+• Automatically excludes very low-probability tokens
+
+Key differences:
+
+• **Flexibility**: Top-p adapts to the probability distribution, while top-k uses a fixed number
+• **Quality**: Top-p typically produces more coherent text by avoiding unlikely tokens
+• **Predictability**: Top-k gives consistent candidate pool sizes, top-p varies based on context
+
+In Bedrock:
+• Most models support both parameters
+• You can use them together (top-k filters first, then top-p)
+• Common values: top-p = 0.9-0.95, top-k = 40-100
+• Lower values = more focused/deterministic output
+• Higher values = more creative/diverse output
+
+For most use cases, top-p alone (around 0.9) provides good results. Combine both when you need fine-grained control over the generation process.
+
 These settings are specifically tuned for infrastructure management tasks, providing reliable and detailed responses for complex AWS operations.
 
 ### Streamlit Web Interface

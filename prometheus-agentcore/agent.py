@@ -1878,7 +1878,7 @@ class ConversationManager:
                         continue
                     
                     response = self.agent(user_input)
-                    print(f"\n{self.bot_name} > {response}")
+                    # strands handles the response automatically, no need to print manually
                     
                 except KeyboardInterrupt:
                     print("\n\n👋 Goodbye!")

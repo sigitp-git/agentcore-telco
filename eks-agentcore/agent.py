@@ -618,11 +618,11 @@ def use_manual_gateway(region=None):
 #         return None, None
 #     
 #     gateway_client = boto3.client("bedrock-agentcore-control", region_name=REGION)
-#     gateway_name = "devopsagent-agentcore-gw"
+#     gateway_name = "eksagent-agentcore-gw"
 #     
 #     # Get configuration
-#     discovery_url = get_ssm_parameter("/app/devopsagent/agentcore/cognito_discovery_url")
-#     client_id = get_ssm_parameter("/app/devopsagent/agentcore/machine_client_id")
+#     discovery_url = get_ssm_parameter("/app/eksagent/agentcore/cognito_discovery_url")
+#     client_id = get_ssm_parameter("/app/eksagent/agentcore/machine_client_id")
 #     
 #     auth_config = {
 #         "customJWTAuthorizer": {
@@ -636,7 +636,7 @@ def use_manual_gateway(region=None):
 #         
 #         create_response = gateway_client.create_gateway(
 #             name=gateway_name,
-#             roleArn=get_ssm_parameter("/app/devopsagent/agentcore/gateway_iam_role"),
+#             roleArn=get_ssm_parameter("/app/eksagent/agentcore/gateway_iam_role"),
 #             protocolType="MCP",
 #             authorizerType="CUSTOM_JWT",
 #             authorizerConfiguration=auth_config,
@@ -650,7 +650,7 @@ def use_manual_gateway(region=None):
 #             "gateway_url": create_response["gatewayUrl"],
 #             "gateway_arn": create_response["gatewayArn"],
 #         }
-#         put_ssm_parameter("/app/devopsagent/agentcore/gateway_id", gateway_id)
+#         put_ssm_parameter("/app/eksagent/agentcore/gateway_id", gateway_id)
 #         print(f"✅ Gateway created successfully with ID: {gateway_id}")
 #         return gateway, gateway_id
 #         
@@ -660,7 +660,7 @@ def use_manual_gateway(region=None):
 
 def try_existing_gateway(gateway_client):
     """Try to use existing gateway if available."""
-    existing_gateway_id = get_ssm_parameter("/app/devopsagent/agentcore/gateway_id")
+    existing_gateway_id = get_ssm_parameter("/app/eksagent/agentcore/gateway_id")
     
     if existing_gateway_id:
         print(f"Found existing gateway with ID: {existing_gateway_id}")
@@ -1364,7 +1364,7 @@ class ConversationManager:
                         continue
                     
                     response = self.agent(user_input)
-                    print(f"\n{self.bot_name} > {response}")
+                    # strands handles the response automatically, no need to print manually
                     
                 except KeyboardInterrupt:
                     print("\n\nGoodbye! Happy EKSing!")

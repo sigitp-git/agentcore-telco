@@ -73,7 +73,7 @@ class AWSMCPManager:
         """Load AWS MCP configuration."""
         try:
             if not os.path.exists(self.config_path):
-                print(f"⚠️  AWS MCP config file not found at {self.config_path}")
+                print(f"ℹ️  AWS MCP config file not found - Bedrock AgentCore Gateway MCP tools will be used")
                 return None
                 
             with open(self.config_path, 'r') as f:
@@ -145,7 +145,7 @@ class AWSMCPManager:
                 full_env.setdefault('LOGURU_LEVEL', 'ERROR')
                 full_env.setdefault('LOG_LEVEL', 'ERROR')
                 
-                # Create MCP client using stdio
+                # Create MCP client
                 server_params = StdioServerParameters(
                     command=command,
                     args=args,
@@ -238,7 +238,7 @@ class AWSMCPManager:
         return self.mcp_tools
     
     def cleanup(self):
-        """Cleanup MCP clients and stdio resources with timeout."""
+        """Cleanup MCP clients and resources with timeout."""
         if self._cleanup_registered:
             return  # Already cleaned up
         
@@ -254,7 +254,7 @@ class AWSMCPManager:
                 try:
                     print(f"   • Stopping {server_name}...")
                     
-                    # For stdio clients, try to terminate the underlying process first
+                    # For MCP clients, try to terminate the underlying process first
                     process = None
                     try:
                         if hasattr(client, '_client_session') and hasattr(client._client_session, '_process'):
@@ -265,12 +265,12 @@ class AWSMCPManager:
                             process = client._process
                         
                         if process and hasattr(process, 'poll') and process.poll() is None:
-                            print(f"   🔄 Terminating stdio process for {server_name}...")
+                            print(f"   🔄 Terminating process for {server_name}...")
                             process.terminate()
                             time.sleep(0.1)  # Very brief wait
                             if process.poll() is None:
                                 process.kill()
-                            print(f"   ✅ {server_name} stdio process terminated")
+                            print(f"   ✅ {server_name} process terminated")
                         elif process:
                             print(f"   ℹ️  {server_name} process already terminated")
                     except Exception as process_error:
@@ -433,29 +433,30 @@ NON-FUNCTIONAL RULES:
     
     @classmethod
     def load_mcp_config(cls):
-        """Load MCP configuration from the specified file path."""
-        if not cls.ENABLE_MCP_CONFIG:
+        """Load MCP configuration from the specified file path for AWS MCP servers."""
+        # This is only used for AWS MCP servers, not AgentCore Gateway MCP
+        if not cls.ENABLE_AWS_MCP:
             return None
             
         try:
-            if not os.path.exists(cls.MCP_CONFIG_PATH):
-                print(f"⚠️  MCP config file not found")
+            if not os.path.exists(cls.AWS_MCP_CONFIG_PATH):
+                # No warning needed - AgentCore Gateway MCP tools will be used instead
                 return None
                 
-            with open(cls.MCP_CONFIG_PATH, 'r') as f:
+            with open(cls.AWS_MCP_CONFIG_PATH, 'r') as f:
                 mcp_config = json.load(f)
                 return mcp_config
                 
         except json.JSONDecodeError as e:
-            print(f"❌ Invalid JSON in MCP config file: {e}")
+            print(f"❌ Invalid JSON in AWS MCP config file: {e}")
             return None
         except Exception as e:
-            print(f"❌ Error loading MCP config: {e}")
+            print(f"❌ Error loading AWS MCP config: {e}")
             return None
     
     @classmethod
     def get_mcp_servers(cls):
-        """Get MCP servers configuration."""
+        """Get AWS MCP servers configuration (not AgentCore Gateway MCP)."""
         mcp_config = cls.load_mcp_config()
         if mcp_config and 'mcpServers' in mcp_config:
             return mcp_config['mcpServers']
@@ -1206,130 +1207,11 @@ def show_available_mcp_servers() -> str:
     result += f"💡 Use `manage_mcp_config(action='server_status', server_name='<name>')` for detailed server info."
     return result
 
-@tool
-def list_eks_clusters() -> str:
-    """List all EKS clusters in the current AWS account and region.
-    
-    Returns:
-        str: A formatted list of EKS clusters with their status and versions
-    """
-    try:
-        import boto3
-        
-        # Use the configured region
-        eks_client = boto3.client('eks', region_name=REGION)
-        
-        # List clusters
-        response = eks_client.list_clusters()
-        clusters = response.get('clusters', [])
-        
-        if not clusters:
-            return "No EKS clusters found in the current region."
-        
-        result = f"Found {len(clusters)} EKS clusters in region {REGION}:\n\n"
-        
-        # Get details for each cluster
-        for cluster_name in clusters:
-            try:
-                cluster_info = eks_client.describe_cluster(name=cluster_name)
-                cluster = cluster_info['cluster']
-                
-                status = cluster.get('status', 'Unknown')
-                version = cluster.get('version', 'Unknown')
-                created = cluster.get('createdAt', 'Unknown')
-                endpoint = cluster.get('endpoint', 'N/A')
-                
-                result += f"• {cluster_name}\n"
-                result += f"  Status: {status}\n"
-                result += f"  Version: {version}\n"
-                result += f"  Created: {created}\n"
-                result += f"  Endpoint: {endpoint}\n\n"
-                
-            except Exception as e:
-                result += f"• {cluster_name}\n"
-                result += f"  Error getting details: {str(e)}\n\n"
-        
-        return result
-        
-    except Exception as e:
-        logger.error(f"Error listing EKS clusters: {e}")
-        return f"Error listing EKS clusters: {str(e)}"
 
-@tool
-def aws_resource_guidance() -> str:
-    """Get guidance on which tools to use for different AWS resource operations.
-    
-    This tool provides guidance on choosing the correct MCP tools for AWS operations.
-    Use this when you need to understand which tool to use for specific AWS tasks.
-    
-    Returns:
-        str: Detailed guidance on AWS tool usage
-    """
-    guidance = """🔧 **AWS Resource Tool Usage Guide**
 
-**For EKS Cluster Operations:**
 
-1. **List EKS Clusters** (AWS Account Level):
-   ✅ USE: `list_eks_clusters()` - Lists all EKS clusters in your account
-   ✅ USE: `list_resources` (CCAPI) with resource_type="AWS::EKS::Cluster"
-   ❌ DON'T USE: `list_k8s_resources` (EKS MCP) - This is for resources WITHIN clusters
 
-2. **Manage Kubernetes Resources** (Within a Cluster):
-   ✅ USE: `list_k8s_resources` (EKS MCP) - Lists pods, services, etc. within a specific cluster
-   ✅ USE: `get_k8s_events` (EKS MCP) - Gets events for specific resources
-   ✅ USE: `get_pod_logs` (EKS MCP) - Gets logs from pods
 
-**For Other AWS Resources:**
-
-3. **List AWS Resources** (Account Level):
-   ✅ USE: `list_resources` (CCAPI) - Lists any AWS resource type (S3, RDS, etc.)
-   ✅ USE: `get_resource` (CCAPI) - Gets details of specific resources
-
-4. **CloudWatch Operations:**
-   ✅ USE: CloudWatch MCP tools for metrics, logs, and alarms
-
-**Key Rule:**
-- EKS MCP tools work WITHIN clusters (need cluster_name parameter)
-- CCAPI/Core MCP tools work at AWS account level (list clusters, buckets, etc.)
-"""
-    return guidance
-
-@tool
-def eks_tool_guidance() -> str:
-    """Get specific guidance for EKS-related operations and tool selection.
-    
-    Use this tool when you need to understand which EKS tools to use for specific tasks.
-    
-    Returns:
-        str: Detailed EKS tool usage guidance
-    """
-    guidance = """🚀 **EKS Tool Selection Guide**
-
-**IMPORTANT: Choose the RIGHT tool for your EKS task!**
-
-**❓ User asks: "List all my EKS clusters"**
-✅ CORRECT: Use `list_eks_clusters()` or `list_resources` with resource_type="AWS::EKS::Cluster"
-❌ WRONG: Don't use `list_k8s_resources` - this needs a cluster name!
-
-**❓ User asks: "List pods in my cluster"**
-✅ CORRECT: Use `list_k8s_resources` with cluster_name="your-cluster" and kind="Pod"
-❌ WRONG: Don't use `list_eks_clusters()` - this only lists clusters, not pods
-
-**❓ User asks: "Show me cluster details"**
-✅ CORRECT: Use `get_resource` with resource_type="AWS::EKS::Cluster" and identifier="cluster-name"
-✅ ALSO CORRECT: Use `list_eks_clusters()` for basic info
-
-**❓ User asks: "Get pod logs"**
-✅ CORRECT: Use `get_pod_logs` with cluster_name, namespace, and pod_name
-
-**Tool Categories:**
-1. **Cluster Management** (AWS Level): list_eks_clusters, get_resource, create_resource
-2. **Kubernetes Resources** (Within Cluster): list_k8s_resources, get_k8s_events, get_pod_logs
-3. **Monitoring** (CloudWatch): get_cloudwatch_logs, get_cloudwatch_metrics
-
-**Remember:** EKS clusters are AWS resources. Pods/Services are Kubernetes resources within clusters.
-"""
-    return guidance
 
 @tool
 def websearch(
@@ -1775,10 +1657,7 @@ def create_tools_list():
         list_mcp_server_names,
         manage_mcp_config,
         list_mcp_servers_from_config,
-        show_available_mcp_servers,
-        list_eks_clusters,
-        aws_resource_guidance,
-        eks_tool_guidance
+        show_available_mcp_servers
     ]
     
     # Add AgentCore Gateway MCP tools if available
@@ -1843,34 +1722,61 @@ class ConversationManager:
         self.exit_commands = {'exit', 'quit', 'bye'}
     
     def _list_all_mcp_tools(self) -> str:
-        """List all MCP tools loaded from the configuration file."""
-        if not AgentConfig.ENABLE_MCP_CONFIG:
-            return "❌ MCP configuration disabled"
+        """List all MCP tools and tool sources available to the agent."""
+        result = "🔧 **Available Tools & Sources:**\n\n"
         
-        servers = AgentConfig.get_mcp_servers()
-        if not servers:
-            return "ℹ️  No MCP servers found"
+        # Built-in tools
+        result += "**Built-in Tools:**\n"
+        result += "• websearch - Web search using DuckDuckGo\n"
+        result += "• MCP configuration management tools (6 tools)\n\n"
         
-        enabled_servers = []
-        disabled_servers = []
+        # AgentCore Gateway MCP tools
+        gateway_status = "🟢 Connected" if mcp_client else "🔴 Disconnected"
+        result += f"**AgentCore Gateway MCP:** {gateway_status}\n"
+        if mcp_client:
+            try:
+                mcp_tools = get_full_tools_list(mcp_client)
+                result += f"• {len(mcp_tools)} tools available\n"
+                result += "• Use `list_mcp_tools()` for detailed list\n"
+            except Exception:
+                result += "• Tools unavailable (connection issue)\n"
+        else:
+            result += "• No tools available (not connected)\n"
+        result += "\n"
         
-        for name, config in servers.items():
-            # Extract clean server name
-            clean_name = name.replace('awslabs.', '').replace('-mcp-server', '').replace('-mcp', '')
+        # AWS MCP tools
+        aws_status = "🟢 Enabled" if aws_mcp_manager else "🔴 Disabled"
+        result += f"**AWS Comprehensive MCP:** {aws_status}\n"
+        if aws_mcp_manager:
+            try:
+                aws_tools = aws_mcp_manager.get_all_aws_tools()
+                result += f"• {len(aws_tools)} AWS tools available\n"
+                result += "• Covers 50+ AWS services (VPC, EC2, S3, EKS, etc.)\n"
+                result += "• Use `list_aws_mcp_tools()` for detailed list\n"
+            except Exception:
+                result += "• Tools unavailable (connection issue)\n"
+        else:
+            result += "• No AWS tools available (disabled)\n"
+        result += "\n"
+        
+        # MCP Configuration Status
+        result += "**MCP Configuration:**\n"
+        if AgentConfig.ENABLE_MCP_CONFIG:
+            result += "• AgentCore Gateway MCP: Enabled (tools from gateway)\n"
+        else:
+            result += "• AgentCore Gateway MCP: Disabled\n"
             
-            if config.get('disabled', False):
-                disabled_servers.append(clean_name)
+        if AgentConfig.ENABLE_AWS_MCP:
+            # Only check config file for AWS MCP servers
+            servers = AgentConfig.get_mcp_servers()
+            if servers:
+                enabled_count = sum(1 for config in servers.values() if not config.get('disabled', False))
+                result += f"• AWS MCP servers: {enabled_count}/{len(servers)} enabled\n"
+                result += "• Use `show_available_mcp_servers()` for server details\n"
             else:
-                enabled_servers.append(clean_name)
-        
-        result = f"🔧 **MCP Tools ({len(enabled_servers)} enabled):**\n"
-        
-        # Show enabled servers in a compact list
-        for i, name in enumerate(enabled_servers, 1):
-            result += f"{i:2d}. {name}\n"
-        
-        if disabled_servers:
-            result += f"\n🔴 **Disabled ({len(disabled_servers)}):** {', '.join(disabled_servers)}"
+                result += "• AWS MCP servers: No config file found\n"
+        else:
+            result += "• AWS MCP servers: Disabled\n"
         
         return result
     
@@ -1878,28 +1784,39 @@ class ConversationManager:
         """Show available commands and help information."""
         help_text = "🔧 **Available Commands:**\n\n"
         help_text += "**Special Commands:**\n"
-        help_text += "• `/tool` or `/tools` - List all MCP tools from configuration\n"
+        help_text += "• `/tool` or `/tools` - List all MCP tool sources and status\n"
         help_text += "• `/help` or `/h` - Show this help message\n"
         help_text += "• `exit`, `quit`, `bye` - Exit the agent\n\n"
         
-        help_text += "**MCP Management Tools:**\n"
-        help_text += "• `list_mcp_server_names()` - Quick list of server names\n"
-        help_text += "• `list_mcp_servers_from_config()` - Detailed server info\n"
-        help_text += "• `manage_mcp_config()` - Manage MCP configuration\n"
-        help_text += "• `show_available_mcp_servers()` - Show servers with details\n\n"
-        
-        help_text += "**MCP Tools:**\n"
-        help_text += "• `list_mcp_tools()` - List AgentCore Gateway MCP tools\n"
-        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (AWS services)\n\n"
-        
-        help_text += "**Other Tools:**\n"
+        help_text += "**Built-in Tools:**\n"
         help_text += "• `websearch()` - Search the web for information\n\n"
         
-        help_text += "💡 **Tips:**\n"
-        help_text += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'}\n"
-        help_text += f"• AWS MCP Integration: {'🟢 Enabled' if aws_mcp_manager else '🔴 Disabled'}\n"
-        help_text += f"• Available MCP Servers: {len(AgentConfig.get_mcp_servers())}\n"
-        help_text += "• Ask me anything about VPC, networking, or AWS!"
+        help_text += "**AWS MCP Configuration Tools:**\n"
+        help_text += "• `list_mcp_server_names()` - Quick list of AWS MCP server names\n"
+        help_text += "• `list_mcp_servers_from_config()` - Detailed AWS MCP server info\n"
+        help_text += "• `manage_mcp_config()` - Manage AWS MCP server configuration\n"
+        help_text += "• `show_available_mcp_servers()` - Show AWS MCP servers with details\n\n"
+        
+        help_text += "**MCP Tool Discovery:**\n"
+        help_text += "• `list_mcp_tools()` - List AgentCore Gateway MCP tools\n"
+        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (comprehensive AWS services)\n\n"
+        
+        help_text += "**AWS Operations:**\n"
+        help_text += "• All AWS operations are provided via MCP tools\n"
+        help_text += "• VPC, EC2, S3, EKS, CloudWatch, and 50+ AWS services\n"
+        help_text += "• Use `list_aws_mcp_tools()` to see available AWS operations\n\n"
+        
+        help_text += "💡 **MCP Tool Sources:**\n"
+        help_text += f"• AgentCore Gateway: {'� ConnCected' if mcp_client else '🔴 Disconnected'} (ENABLE_MCP_CONFIG)\n"
+        help_text += f"• AWS MCP: {'🟢 Enabled' if aws_mcp_manager else '🔴 Disabled'} (ENABLE_AWS_MCP)\n"
+        
+        # Only show server count for AWS MCP (which uses config file)
+        if AgentConfig.ENABLE_AWS_MCP:
+            server_count = len(AgentConfig.get_mcp_servers())
+            help_text += f"• AWS MCP Servers: {server_count} configured\n"
+        help_text += "\n"
+        help_text += "🌐 **VPC Expertise:**\n"
+        help_text += "• Ask me anything about VPC, networking, security groups, routing!\n"
         
         return help_text
     

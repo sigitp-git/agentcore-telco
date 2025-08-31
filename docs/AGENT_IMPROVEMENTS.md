@@ -480,6 +480,38 @@ python3 {agent}-agentcore/agent.py setup
 python3 {agent}-agentcore/agent.py --help
 ```
 
+## MCP Configuration Refactoring
+Files Modified (8 total):
+
+```bash
+eks-agentcore/agent.py & agent_runtime.py
+vpc-agentcore/agent.py & agent_runtime.py
+outposts-agentcore/agent.py & agent_runtime.py
+prometheus-agentcore/agent.py & agent_runtime.py
+```
+
+Key Changes:
+1. AgentCore Gateway MCP Integration
+- Enabled `ENABLE_MCP_CONFIG = True` in all agent runtime environments
+- Cleared `MCP_CONFIG_PATH = ''` to use AgentCore Gateway instead of local config files
+
+2. AWS MCP Tools Separation
+- Maintained `ENABLE_AWS_MCP = False` in runtime environments
+- Prevents initialization conflicts and timeouts from comprehensive AWS MCP tool suite
+- Keeps AWS MCP tools available for development/interactive mode
+
+3. Improved Configuration Comments
+- Updated comments to clarify the distinction between AgentCore Gateway MCP and AWS MCP tools
+- Better documentation of runtime vs development configurations
+
+Impact:
+- Runtime Agents: Now can access MCP tools through the AgentCore Gateway
+- Development Mode: Still has access to full AWS MCP tool suite when needed
+- Performance: Eliminates timeout issues from slow AWS MCP server initialization
+- Consistency: All four agents (EKS, VPC, Outposts, Prometheus) now follow the same pattern
+
+This refactoring enables proper MCP tool integration through the AgentCore Gateway while maintaining the robust AWS MCP capabilities for development scenarios.
+
 ## Conclusion
 
 The agent improvements provide a robust, scalable, and maintainable foundation for AWS infrastructure management. The enhancements focus on reliability, extensibility, and user experience while maintaining full backward compatibility across all agents in the telco project.

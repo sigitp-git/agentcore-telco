@@ -46,6 +46,34 @@ class StreamlitAgentInterface:
         arn = os.getenv("VPC_AGENT_RUNTIME_ARN", "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/vpc_agent-RUNTIME_ID")
         return arn
     
+    def get_agent_gateway_id(self):
+        """Get the agent gateway ID for VPC Agent from environment variable."""
+        # Get VPC Agent gateway ID from environment variable
+        gateway_id = os.getenv("VPC_AGENT_GATEWAY_ID", "vpc-agent-agentcore-gw-GATEWAY_ID")
+        return gateway_id
+    
+    def get_runtime_info(self):
+        """Get formatted runtime and gateway information."""
+        runtime_arn = self.get_agent_runtime_arn()
+        gateway_id = self.get_agent_gateway_id()
+        
+        # Extract runtime ID from ARN
+        runtime_id = "RUNTIME_ID"
+        if "runtime/" in runtime_arn:
+            runtime_id = runtime_arn.split("runtime/")[-1]
+        
+        # Check if using actual values or placeholders
+        runtime_status = "✅ Active" if "ACCOUNT_ID" not in runtime_arn else "⚠️ Placeholder"
+        gateway_status = "✅ Active" if "GATEWAY_ID" not in gateway_id else "⚠️ Placeholder"
+        
+        return {
+            "runtime_arn": runtime_arn,
+            "runtime_id": runtime_id,
+            "runtime_status": runtime_status,
+            "gateway_id": gateway_id,
+            "gateway_status": gateway_status
+        }
+    
     def invoke_agent(self, prompt, session_id=None):
         """Invoke the agent with a prompt."""
         try:
@@ -145,6 +173,30 @@ def main():
     # Sidebar
     with st.sidebar:
         st.header("🛠️ Agent Controls")
+        
+        # AgentCore Runtime & Gateway Information
+        st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
+        st.subheader("🏗️ AgentCore Configuration")
+        
+        # Get runtime and gateway info
+        runtime_info = st.session_state.agent_interface.get_runtime_info()
+        
+        # Display Runtime Information
+        st.markdown("**🚀 Runtime:**")
+        st.text(f"Status: {runtime_info['runtime_status']}")
+        st.text(f"ID: {runtime_info['runtime_id']}")
+        
+        # Display Gateway Information  
+        st.markdown("**🌐 Gateway:**")
+        st.text(f"Status: {runtime_info['gateway_status']}")
+        st.text(f"ID: {runtime_info['gateway_id']}")
+        
+        # Show full ARN in expander for technical details
+        with st.expander("🔍 Technical Details"):
+            st.code(f"Runtime ARN:\n{runtime_info['runtime_arn']}", language="text")
+            st.code(f"Gateway ID:\n{runtime_info['gateway_id']}", language="text")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Session information
         st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)

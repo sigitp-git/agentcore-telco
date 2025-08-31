@@ -46,6 +46,34 @@ class StreamlitAgentInterface:
         arn = os.getenv("EKS_AGENT_RUNTIME_ARN", "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/eks_agent-RUNTIME_ID")
         return arn
     
+    def get_agent_gateway_id(self):
+        """Get the agent gateway ID for EKS Agent from environment variable."""
+        # Get EKS Agent gateway ID from environment variable
+        gateway_id = os.getenv("EKS_AGENT_GATEWAY_ID", "eks-agent-agentcore-gw-GATEWAY_ID")
+        return gateway_id
+    
+    def get_runtime_info(self):
+        """Get formatted runtime and gateway information."""
+        runtime_arn = self.get_agent_runtime_arn()
+        gateway_id = self.get_agent_gateway_id()
+        
+        # Extract runtime ID from ARN
+        runtime_id = "RUNTIME_ID"
+        if "runtime/" in runtime_arn:
+            runtime_id = runtime_arn.split("runtime/")[-1]
+        
+        # Check if using actual values or placeholders
+        runtime_status = "✅ Active" if "ACCOUNT_ID" not in runtime_arn else "⚠️ Placeholder"
+        gateway_status = "✅ Active" if "GATEWAY_ID" not in gateway_id else "⚠️ Placeholder"
+        
+        return {
+            "runtime_arn": runtime_arn,
+            "runtime_id": runtime_id,
+            "runtime_status": runtime_status,
+            "gateway_id": gateway_id,
+            "gateway_status": gateway_status
+        }
+    
     def invoke_agent(self, prompt, session_id=None):
         """Invoke the agent with a prompt."""
         try:

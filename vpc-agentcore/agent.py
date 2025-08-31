@@ -317,11 +317,11 @@ class AgentConfig:
     DEFAULT_REGION = 'us-east-1'
     
     # MCP Configuration
-    ENABLE_MCP_CONFIG = True  # Toggle to enable/disable MCP config loading
-    MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'
+    ENABLE_MCP_CONFIG = True  # Toggle to enable/disable AgentCore Gateway MCP config loading
+    MCP_CONFIG_PATH = ''
     
     # AWS MCP Configuration
-    ENABLE_AWS_MCP = True  # Toggle to enable/disable AWS MCP integration
+    ENABLE_AWS_MCP = True  # Toggle to enable/disable comprehensive AWS MCP integration
     AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'  # Path to AWS MCP config file
     
     # Available Models

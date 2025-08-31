@@ -22,8 +22,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 # Import and configure AgentConfig first
 from agent import AgentConfig
 
-# Disable MCP configuration for runtime environment
-AgentConfig.ENABLE_MCP_CONFIG = False
+# Disable AWS_MCP but enable AgentCore Gateway MCP configuration for runtime environment
+AgentConfig.ENABLE_MCP_CONFIG = True
 AgentConfig.ENABLE_AWS_MCP = False
 
 # Import agent module and initialization functions

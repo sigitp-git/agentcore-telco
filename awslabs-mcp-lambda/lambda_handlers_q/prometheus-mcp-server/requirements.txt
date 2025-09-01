@@ -1,0 +1,3 @@
+run-mcp-servers-with-aws-lambda==0.4.2
+awslabs.prometheus-mcp-server==0.2.5
+boto3==1.40.18

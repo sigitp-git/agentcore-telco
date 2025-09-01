@@ -1,8 +1,15 @@
 """
 AWS Labs MCP Lambda Stack
 
-Creates individual Lambda functions for each MCP server defined in servers.yaml
-Uses the run-mcp-servers-with-aws-lambda library pattern for serverless MCP deployment.
+Creates individual Lambda functions for each MCP server defined in servers.yaml.
+Uses the proven mcp_lambda library pattern with BedrockAgentCoreGatewayTargetHandler
+for reliable serverless MCP deployment with AgentCore Gateway integration.
+
+Each Lambda function:
+- Uses the working mcp_lambda library pattern from lambda_handlers_q/
+- Extracts AWS credentials from Lambda execution role automatically
+- Implements MockClientContext for missing bedrockAgentCoreToolName
+- Handles StdioServerParameters configuration for MCP servers
 """
 
 import os
@@ -12,7 +19,6 @@ from aws_cdk import (
     Duration,
     aws_lambda as _lambda,
     aws_iam as iam,
-    aws_logs as logs,
 )
 from aws_cdk.aws_lambda_python_alpha import PythonFunction
 from constructs import Construct
@@ -36,28 +42,25 @@ class McpLambdaStack(Stack):
         """Create a Lambda function for a specific MCP server"""
         
         function_name = f"mcp-server-{server_id}"
-        handler_name = f"{server_id.replace('-', '')}function_handler"
         
         # Create IAM role for the Lambda function
         lambda_role = self._create_lambda_role(server_id, config)
         
-        # Prepare environment variables, filtering out reserved ones
-        env_vars = {
-            'MCP_COMMAND': config['command'],
-            'MCP_ARGS': ','.join(config['args']),
-        }
+        # Prepare environment variables for the new mcp_lambda pattern
+        # The new handlers extract AWS credentials from execution role automatically
+        # and configure the MCP server parameters directly in the handler code
+        env_vars = {}
         
         # Add server-specific env vars, but skip reserved Lambda variables
         reserved_vars = {'AWS_REGION', 'AWS_DEFAULT_REGION', 'AWS_LAMBDA_FUNCTION_NAME', 
-                        'AWS_LAMBDA_FUNCTION_VERSION', 'AWS_LAMBDA_FUNCTION_MEMORY_SIZE'}
+                        'AWS_LAMBDA_FUNCTION_VERSION', 'AWS_LAMBDA_FUNCTION_MEMORY_SIZE',
+                        'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN'}
         
         for key, value in config.get('env', {}).items():
             if key not in reserved_vars:
                 env_vars[key] = value
         
-        # Create log group explicitly (only if it doesn't exist)
-        # Note: We'll let Lambda create the log group automatically to avoid conflicts
-        log_group = None
+        # Lambda will create log groups automatically
         
         # Create Lambda function with Python dependencies
         lambda_function = PythonFunction(
@@ -65,15 +68,14 @@ class McpLambdaStack(Stack):
             f"McpLambda{server_id.replace('-', '').title()}",
             function_name=function_name,
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="lambda_handler",
-            entry="lambda_handlers",
-            index=f"{handler_name}.py",
+            handler="lambda_function.lambda_handler",
+            entry=f"lambda_handlers_q/{server_id}",
             role=lambda_role,
             timeout=Duration.seconds(config.get('timeout', 60)),
             memory_size=config.get('memory', 1024),
             environment=env_vars,
             description=config.get('description', f"MCP Server: {config['name']}"),
-            # PythonFunction automatically handles requirements.txt
+            # PythonFunction automatically handles requirements.txt from lambda_handlers_q/{server_id}/
         )
         
         self.lambda_functions[server_id] = lambda_function
@@ -170,6 +172,18 @@ class McpLambdaStack(Stack):
             'ccapi-mcp': [
                 "cloudcontrol:*",
                 "cloudformation:*"
+            ],
+            'github': [
+                # GitHub MCP server - no AWS permissions needed
+            ],
+            'git-repo': [
+                # Git repo MCP server - no AWS permissions needed  
+            ],
+            'filesystem': [
+                # Filesystem MCP server - only needs /tmp access (built-in)
+            ],
+            'frontend-mcp': [
+                "bedrock:InvokeModel"
             ]
         }
         

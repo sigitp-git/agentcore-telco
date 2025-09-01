@@ -1,8 +1,8 @@
 # AWS Labs MCP Lambda - Serverless MCP Deployment
 
-Deploy 18 Model Context Protocol (MCP) servers as individual AWS Lambda functions using the `run-mcp-servers-with-aws-lambda` library (v0.4.1). Each MCP server gets its own dedicated Lambda function for optimal isolation and scaling.
+Deploy 18 Model Context Protocol (MCP) servers as individual AWS Lambda functions using the proven `mcp_lambda` library pattern. Each MCP server gets its own dedicated Lambda function for optimal isolation and scaling.
 
-**✅ DEPLOYMENT STATUS: COMPLETE - All 18 functions operational and ready for AgentCore Gateway integration!**
+**✅ STATUS: All 18 MCP servers using proven mcp_lambda library pattern - Ready for deployment!**
 
 ## 🎯 Architecture
 
@@ -15,7 +15,7 @@ Deploy 18 Model Context Protocol (MCP) servers as individual AWS Lambda function
                               │
                               ▼
                        ┌──────────────────┐
-                       │ mcp_lambda lib   │
+                       │ mcp_lambda       │
                        │ BedrockAgentCore │
                        │ GatewayTarget    │
                        │ Handler          │
@@ -23,7 +23,7 @@ Deploy 18 Model Context Protocol (MCP) servers as individual AWS Lambda function
 ```
 
 **1:1 Mapping**: One Lambda function per MCP server for complete isolation and independent scaling.
-**Library Integration**: Uses `run-mcp-servers-with-aws-lambda` v0.4.1 for seamless stdio-based MCP server execution in Lambda environment.
+**Proven Pattern**: Uses working `mcp_lambda` library with `BedrockAgentCoreGatewayTargetHandler` for reliable AgentCore Gateway integration.
 
 ## 🚀 Supported MCP Servers (18 Total)
 
@@ -64,25 +64,32 @@ awslabs-mcp-lambda/
 ├── infrastructure/
 │   ├── __init__.py
 │   └── mcp_lambda_stack.py     # CDK stack with MCP Lambda functions
-└── lambda_handlers/            # Generated Lambda handlers
-    └── requirements.txt        # Lambda runtime dependencies
+├── lambda_handlers_q/          # Working Lambda handlers using mcp_lambda library
+│   ├── prometheus/             # Example: Prometheus MCP server handler
+│   │   ├── lambda_function.py  # Working handler implementation
+│   │   └── requirements.txt    # Handler dependencies
+│   └── ... (17 more handlers)
+├── generate_all_handlers.py    # Script to generate all handlers from servers.yaml
+├── deploy_updated_stack.sh     # Deployment script
+├── verify_deployment.py        # Deployment verification script
+└── verify_handlers.py          # Handler validation script
 ```
 
 ## ⚡ Quick Start
 
-### 1. **Generate Proper Handlers**
+### 1. **Generate Working Lambda Handlers** (if not already done)
 ```bash
-python3 create_proper_handlers.py
+python3 generate_all_handlers.py
 ```
 
-### 2. **Deploy Lambda Functions**
+### 2. **Deploy Updated Lambda Functions**
 ```bash
-cdk deploy --require-approval never
+./deploy_updated_stack.sh
 ```
 
-### 3. **Test Deployment**
+### 3. **Verify Deployment**
 ```bash
-AWS_DEFAULT_REGION=us-east-1 python3 test_lambda_functions.py
+python3 verify_deployment.py
 ```
 
 ### 4. **Get Lambda ARNs**
@@ -291,8 +298,9 @@ See [LIBRARY_OVERVIEW.md](LIBRARY_OVERVIEW.md) for comprehensive documentation a
    ```
 
 3. **Lambda Handler Generation**
-   - Handlers are auto-generated during CDK synthesis
-   - Check `lambda_handlers/` directory after running `cdk synth`
+   - Handlers are generated using the working mcp_lambda pattern
+   - Run `python3 generate_all_handlers.py` to create all handlers
+   - Check `lambda_handlers_q/` directory for generated handlers
 
 4. **Permission Errors**
    - Verify AWS CLI configuration

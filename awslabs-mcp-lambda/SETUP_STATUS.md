@@ -119,3 +119,49 @@ Each Lambda function is configured with:
 4. **Optimize**: Adjust memory/timeout based on usage patterns
 
 The awslabs-mcp-lambda project is now fully functional and ready for production use!
+
+
+## Fix uvx Lambda runtime issues
+
+The `fix_uvx_issue.py` file does use mcp_lambda libraries. Here's what it does:
+
+### MCP Lambda Library Usage:
+The script generates Lambda handlers that import and use these mcp_lambda components:
+
+1. `BedrockAgentCoreGatewayTargetHandler` - Main handler for Bedrock AgentCore Gateway integration
+2. `StdioServerAdapterRequestHandler` - Adapter for stdio-based MCP servers
+
+### Key Features:
+1. MCP Lambda Integration:
+
+```bash
+# Import the mcp_lambda library components
+from mcp_lambda.handlers.bedrock_agent_core_gateway_target_handler import BedrockAgentCoreGatewayTargetHandler
+from mcp_lambda.server_adapter.stdio_server_adapter_request_handler import StdioServerAdapterRequestHandler
+
+# Create request handler with stdio server adapter
+request_handler = StdioServerAdapterRequestHandler(server_config)
+
+# Create Bedrock AgentCore Gateway handler
+gateway_handler = BedrockAgentCoreGatewayTargetHandler(request_handler)
+
+# Handle the request
+return gateway_handler.handle(event, context)
+```
+
+2. What the Script Does:
+- Generates Lambda Handlers - Creates Python handler files for each MCP server defined in `servers.yaml`
+
+- Fixes uvx Installation Issues - Adds logic to install `uv` in Lambda environments where `uvx` isn't available
+
+- Uses mcp_lambda Architecture - Each generated handler uses the `mcp_lambda` library to:
+-- Run stdio-based MCP servers in Lambda
+-- Integrate with Bedrock AgentCore Gateway
+-- Handle MCP protocol communication
+
+- Error Handling - Includes fallback error handling if `mcp_lambda` library has issues
+
+3. Purpose:
+This script is designed to fix the common issue where Lambda environments don't have uvx available by default, which is needed to run many MCP servers. It generates handlers that can dynamically install uv in the Lambda environment and then use the mcp_lambda library to run the MCP servers.
+
+It's heavily dependent on the `mcp_lambda` libraries for its core functionality - it's essentially a generator that creates Lambda handlers using the `mcp_lambda` framework.

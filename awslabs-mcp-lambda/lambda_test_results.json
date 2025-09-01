@@ -1,0 +1,758 @@
+[
+  {
+    "server_id": "core-mcp",
+    "function_name": "mcp-server-core-mcp",
+    "name": "AWS Labs Core MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 398.88,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "core-mcp",
+              "server_name": "AWS Labs Core MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 29.24,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "core-mcp",
+              "server_name": "AWS Labs Core MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "aws-pricing",
+    "function_name": "mcp-server-aws-pricing",
+    "name": "AWS Pricing MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 418.51,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-pricing",
+              "server_name": "AWS Pricing MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 52.06,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-pricing",
+              "server_name": "AWS Pricing MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "aws-docs",
+    "function_name": "mcp-server-aws-docs",
+    "name": "AWS Documentation MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 431.55,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-docs",
+              "server_name": "AWS Documentation MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 39.26,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-docs",
+              "server_name": "AWS Documentation MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "frontend-mcp",
+    "function_name": "mcp-server-frontend-mcp",
+    "name": "AWS Labs Frontend MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 282.12,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "frontend-mcp",
+              "server_name": "AWS Labs Frontend MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 25.62,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "frontend-mcp",
+              "server_name": "AWS Labs Frontend MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "aws-location",
+    "function_name": "mcp-server-aws-location",
+    "name": "AWS Location MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 257.02,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-location",
+              "server_name": "AWS Location MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 19.27,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-location",
+              "server_name": "AWS Location MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "git-repo-research",
+    "function_name": "mcp-server-git-repo-research",
+    "name": "Git Repository Research MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 257.12,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "git-repo-research",
+              "server_name": "Git Repository Research MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 22.89,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "git-repo-research",
+              "server_name": "Git Repository Research MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "eks-mcp",
+    "function_name": "mcp-server-eks-mcp",
+    "name": "AWS EKS MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 252.51,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "eks-mcp",
+              "server_name": "AWS EKS MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 30.08,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "eks-mcp",
+              "server_name": "AWS EKS MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "aws-diagram",
+    "function_name": "mcp-server-aws-diagram",
+    "name": "AWS Diagram MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 271.39,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-diagram",
+              "server_name": "AWS Diagram MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 23.29,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-diagram",
+              "server_name": "AWS Diagram MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "prometheus",
+    "function_name": "mcp-server-prometheus",
+    "name": "Prometheus MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 338.71,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "prometheus",
+              "server_name": "Prometheus MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 38.99,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "prometheus",
+              "server_name": "Prometheus MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "cfn-mcp",
+    "function_name": "mcp-server-cfn-mcp",
+    "name": "AWS CloudFormation MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 279.9,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "cfn-mcp",
+              "server_name": "AWS CloudFormation MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 28.44,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "cfn-mcp",
+              "server_name": "AWS CloudFormation MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "terraform-mcp",
+    "function_name": "mcp-server-terraform-mcp",
+    "name": "Terraform MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 325.18,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "terraform-mcp",
+              "server_name": "Terraform MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 22.28,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "terraform-mcp",
+              "server_name": "Terraform MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "aws-knowledge",
+    "function_name": "mcp-server-aws-knowledge",
+    "name": "AWS Knowledge MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 241.52,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-knowledge",
+              "server_name": "AWS Knowledge MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 21.75,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "aws-knowledge",
+              "server_name": "AWS Knowledge MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "cloudwatch-mcp",
+    "function_name": "mcp-server-cloudwatch-mcp",
+    "name": "AWS CloudWatch MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 256.97,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "cloudwatch-mcp",
+              "server_name": "AWS CloudWatch MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 25.57,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "cloudwatch-mcp",
+              "server_name": "AWS CloudWatch MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "ccapi-mcp",
+    "function_name": "mcp-server-ccapi-mcp",
+    "name": "AWS Cloud Control API MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 243.36,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "ccapi-mcp",
+              "server_name": "AWS Cloud Control API MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 26.03,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "ccapi-mcp",
+              "server_name": "AWS Cloud Control API MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "cloudwatch-appsignals",
+    "function_name": "mcp-server-cloudwatch-appsignals",
+    "name": "AWS CloudWatch Application Signals MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 260.84,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "cloudwatch-appsignals",
+              "server_name": "AWS CloudWatch Application Signals MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 21.91,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "cloudwatch-appsignals",
+              "server_name": "AWS CloudWatch Application Signals MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "github",
+    "function_name": "mcp-server-github",
+    "name": "GitHub MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 255.18,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'docker'",
+            "data": {
+              "server_id": "github",
+              "server_name": "GitHub MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 19.73,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'docker'",
+            "data": {
+              "server_id": "github",
+              "server_name": "GitHub MCP Server"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "git-repo",
+    "function_name": "mcp-server-git-repo",
+    "name": "Git Repository MCP Server (Legacy)",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 261.16,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "git-repo",
+              "server_name": "Git Repository MCP Server (Legacy)"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 27.7,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "git-repo",
+              "server_name": "Git Repository MCP Server (Legacy)"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "server_id": "filesystem",
+    "function_name": "mcp-server-filesystem",
+    "name": "Filesystem MCP Server",
+    "tests": {
+      "initialize": {
+        "success": true,
+        "duration_ms": 265.51,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "filesystem",
+              "server_name": "Filesystem MCP Server"
+            }
+          }
+        },
+        "mcp_valid": false
+      },
+      "list_tools": {
+        "success": true,
+        "duration_ms": 26.22,
+        "status_code": 200,
+        "response": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "error": {
+            "code": -32603,
+            "message": "Internal error: [Errno 2] No such file or directory: 'uvx'",
+            "data": {
+              "server_id": "filesystem",
+              "server_name": "Filesystem MCP Server"
+            }
+          }
+        }
+      }
+    }
+  }
+]

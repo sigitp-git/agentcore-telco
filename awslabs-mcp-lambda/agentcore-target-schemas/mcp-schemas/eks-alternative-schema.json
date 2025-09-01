@@ -1,0 +1,213 @@
+[
+    {
+      "description": "List EKS clusters in the specified region",
+      "inputSchema": {
+        "properties": {
+          "region": {
+            "description": "AWS region to query for EKS clusters",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "list_clusters"
+    },
+    {
+      "description": "Get detailed information about a specific EKS cluster",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "Name of the EKS cluster to describe",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region where the cluster is located",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster_name"
+        ],
+        "type": "object"
+      },
+      "name": "describe_cluster"
+    },
+    {
+      "description": "List node groups for a specific EKS cluster",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "Name of the EKS cluster",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region where the cluster is located",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster_name"
+        ],
+        "type": "object"
+      },
+      "name": "list_node_groups"
+    },
+    {
+      "description": "Get detailed information about a specific EKS node group",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "Name of the EKS cluster",
+            "type": "string"
+          },
+          "node_group_name": {
+            "description": "Name of the node group to describe",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region where the cluster is located",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster_name",
+          "node_group_name"
+        ],
+        "type": "object"
+      },
+      "name": "describe_node_group"
+    },
+    {
+      "description": "Get logs from CloudWatch for a specific EKS resource",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "Name of the EKS cluster where the resource is located",
+            "type": "string"
+          },
+          "end_time": {
+            "description": "End time in ISO format (defaults to now)",
+            "type": "string"
+          },
+          "filter_pattern": {
+            "description": "Additional CloudWatch Logs filter pattern",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of log entries to return",
+            "type": "integer"
+          },
+          "log_type": {
+            "description": "Log type to query",
+            "type": "string"
+          },
+          "minutes": {
+            "description": "Number of minutes to look back for logs",
+            "type": "integer"
+          },
+          "region": {
+            "description": "AWS region where the cluster is located",
+            "type": "string"
+          },
+          "resource_name": {
+            "description": "Resource name to search for in log messages",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "Resource type to search logs for",
+            "type": "string"
+          },
+          "start_time": {
+            "description": "Start time in ISO format (overrides minutes parameter)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "cluster_name",
+          "log_type"
+        ],
+        "type": "object"
+      },
+      "name": "get_cloudwatch_logs"
+    },
+    {
+      "description": "Get metrics from CloudWatch for a specific EKS resource",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "Name of the EKS cluster to get metrics for",
+            "type": "string"
+          },
+          "dimensions": {
+            "description": "Dimensions to use for the CloudWatch metric query",
+            "type": "object"
+          },
+          "end_time": {
+            "description": "End time in ISO format (defaults to now)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of data points to return",
+            "type": "integer"
+          },
+          "metric_name": {
+            "description": "Metric name to retrieve (e.g., cpu_usage_total, memory_rss)",
+            "type": "string"
+          },
+          "minutes": {
+            "description": "Number of minutes to look back for metrics",
+            "type": "integer"
+          },
+          "namespace": {
+            "description": "CloudWatch namespace where the metric is stored",
+            "type": "string"
+          },
+          "period": {
+            "description": "Period in seconds for the metric data points",
+            "type": "integer"
+          },
+          "region": {
+            "description": "AWS region where the cluster is located",
+            "type": "string"
+          },
+          "start_time": {
+            "description": "Start time in ISO format (overrides minutes parameter)",
+            "type": "string"
+          },
+          "stat": {
+            "description": "Statistic to use for the metric aggregation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster_name",
+          "metric_name",
+          "namespace",
+          "dimensions"
+        ],
+        "type": "object"
+      },
+      "name": "get_cloudwatch_metrics"
+    },
+    {
+      "description": "Search the EKS Troubleshoot Guide for troubleshooting information",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "description": "Your specific question or issue description related to EKS troubleshooting",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region for context",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "name": "search_eks_troubleshoot_guide"
+    }
+  ]

@@ -321,7 +321,6 @@ models/
 # Data files
 data/
 *.csv
-*.json
 *.parquet
 
 # Output files

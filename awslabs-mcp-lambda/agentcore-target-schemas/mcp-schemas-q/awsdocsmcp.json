@@ -1,0 +1,54 @@
+[
+    {
+      "description": "Fetch and convert an AWS documentation page to markdown format",
+      "inputSchema": {
+        "properties": {
+          "url": {
+            "description": "URL of the AWS documentation page to read",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "name": "readDocumentation"
+    },
+    {
+      "description": "Search across all AWS documentation for pages matching the search phrase",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "description": "Maximum number of results to return",
+            "type": "integer"
+          },
+          "searchPhrase": {
+            "description": "Search phrase to use",
+            "type": "string"
+          }
+        },
+        "required": [
+          "searchPhrase"
+        ],
+        "type": "object"
+      },
+      "name": "searchDocumentation"
+    },
+    {
+      "description": "Get recommendations for related AWS documentation pages based on a given URL",
+      "inputSchema": {
+        "properties": {
+          "url": {
+            "description": "URL of the AWS documentation page to get recommendations for",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "name": "recommend"
+    }
+  ]

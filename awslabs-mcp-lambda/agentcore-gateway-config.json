@@ -1,0 +1,94 @@
+{
+  "mcpServers": {
+    "core-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-core-mcp",
+      "description": "Core AWS functionality and prompt understanding"
+    },
+    "aws-pricing": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-aws-pricing",
+      "description": "Get AWS service pricing information"
+    },
+    "aws-docs": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-aws-docs",
+      "description": "Search and retrieve AWS documentation"
+    },
+    "frontend-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-frontend-mcp",
+      "description": "Frontend development tools and React documentation"
+    },
+    "aws-location": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-aws-location",
+      "description": "AWS Location Service for geocoding and mapping"
+    },
+    "git-repo-research": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-git-repo-research",
+      "description": "Advanced git repository analysis and research"
+    },
+    "eks-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-eks-mcp",
+      "description": "Amazon EKS cluster management and troubleshooting"
+    },
+    "aws-diagram": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-aws-diagram",
+      "description": "Generate AWS architecture diagrams"
+    },
+    "prometheus": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-prometheus",
+      "description": "Prometheus metrics and monitoring"
+    },
+    "cfn-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-cfn-mcp",
+      "description": "CloudFormation template management and operations"
+    },
+    "terraform-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-terraform-mcp",
+      "description": "Terraform infrastructure management"
+    },
+    "aws-knowledge": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-aws-knowledge",
+      "description": "AWS Knowledge base via proxy"
+    },
+    "cloudwatch-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-cloudwatch-mcp",
+      "description": "CloudWatch logs and metrics analysis"
+    },
+    "cloudwatch-appsignals": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-cloudwatch-appsignals",
+      "description": "CloudWatch Application Signals monitoring"
+    },
+    "ccapi-mcp": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-ccapi-mcp",
+      "description": "AWS Cloud Control API resource management"
+    },
+    "github": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-github",
+      "description": "GitHub repository and issue management"
+    },
+    "git-repo": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-git-repo",
+      "description": "Basic git repository operations"
+    },
+    "filesystem": {
+      "type": "lambda",
+      "arn": "arn:aws:lambda:REGION:ACCOUNT:function:mcp-server-filesystem",
+      "description": "File system operations (Lambda /tmp only)"
+    }
+  }
+}

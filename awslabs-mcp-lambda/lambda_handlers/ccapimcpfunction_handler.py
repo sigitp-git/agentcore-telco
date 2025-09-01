@@ -14,25 +14,65 @@ def install_uv_if_needed():
     """Install uv if not available in the Lambda environment"""
     try:
         # Check if uvx is available
-        subprocess.run(['uvx', '--version'], check=True, capture_output=True)
+        result = subprocess.run(['uvx', '--version'], check=True, capture_output=True, text=True)
+        print(f"✅ uvx is available: {result.stdout.strip()}")
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         try:
-            # Try to install uv using pip
-            print("Installing uv in Lambda environment...")
-            subprocess.run([sys.executable, '-m', 'pip', 'install', 'uv'], check=True)
+            print("🔧 Installing uv in Lambda environment...")
             
-            # Add uv to PATH
-            uv_bin = os.path.expanduser('~/.local/bin')
-            if uv_bin not in os.environ.get('PATH', ''):
-                os.environ['PATH'] = f"{uv_bin}:{os.environ.get('PATH', '')}"
+            # Install uv to /tmp (writable in Lambda)
+            subprocess.run([
+                sys.executable, '-m', 'pip', 'install', 'uv', 
+                '--target', '/tmp/uv_install', '--quiet'
+            ], check=True)
             
-            # Test if uvx is now available
-            subprocess.run(['uvx', '--version'], check=True, capture_output=True)
-            print("✅ Successfully installed uv in Lambda environment")
-            return True
+            # Add the installation directory to Python path
+            sys.path.insert(0, '/tmp/uv_install')
+            
+            # Add potential uv locations to PATH
+            potential_paths = [
+                '/tmp/uv_install/bin',
+                '/tmp/uv_install',
+                os.path.expanduser('~/.local/bin'),
+                '/var/runtime/.local/bin',
+                '/opt/python/bin',
+                '/usr/local/bin'
+            ]
+            
+            current_path = os.environ.get('PATH', '')
+            for path in potential_paths:
+                if path not in current_path:
+                    current_path = f"{path}:{current_path}"
+            
+            os.environ['PATH'] = current_path
+            print(f"🔧 Updated PATH: {current_path}")
+            
+            # Try to find uvx executable
+            uvx_paths = [
+                '/tmp/uv_install/bin/uvx',
+                '/tmp/uv_install/uvx',
+                'uvx'
+            ]
+            
+            for uvx_path in uvx_paths:
+                try:
+                    result = subprocess.run([uvx_path, '--version'], check=True, capture_output=True, text=True)
+                    print(f"✅ Successfully found uvx at {uvx_path}: {result.stdout.strip()}")
+                    return True
+                except (subprocess.CalledProcessError, FileNotFoundError):
+                    continue
+            
+            print("❌ uvx not found after installation")
+            return False
+            
         except Exception as e:
             print(f"❌ Failed to install uv: {e}")
+            # Try to find uvx in common locations
+            for path in ['/var/runtime/.local/bin/uvx', '/opt/python/bin/uvx', '/usr/local/bin/uvx']:
+                if os.path.exists(path):
+                    print(f"🔍 Found uvx at: {path}")
+                    return True
             return False
 
 

@@ -5,6 +5,7 @@ Test a single Lambda function to see what happens with the current implementatio
 
 import json
 import boto3
+import sys
 
 
 def test_single_lambda():
@@ -13,7 +14,7 @@ def test_single_lambda():
     # Use the region from our deployment
     lambda_client = boto3.client('lambda', region_name='us-east-1')
     
-    function_name = "mcp-server-core-mcp"
+    function_name = sys.argv[1] if len(sys.argv) > 1 else "mcp-server-core-mcp"
     
     # MCP initialize request
     test_payload = {

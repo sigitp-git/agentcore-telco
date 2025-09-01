@@ -9,8 +9,8 @@ import os
 import time
 import uuid
 from datetime import datetime
-# Removed get_ssm_parameter import - using environment variables
 from agent import AgentConfig
+from utils import get_ssm_parameter
 
 # Load environment variables from .env.agents file
 try:
@@ -34,6 +34,7 @@ class AgentRuntimeInvoker:
     def __init__(self, region="us-east-1"):
         self.region = region
         self.client = boto3.client('bedrock-agentcore', region_name=region)
+        self.gateway_client = boto3.client('bedrock-agentcore-control', region_name=region)
         
         # Print current model configuration
         current_model = AgentConfig.get_model_id()
@@ -42,13 +43,147 @@ class AgentRuntimeInvoker:
         print(f"📝 Model ID: {current_model}")
         print()
         
+        # Display gateway and runtime information
+        self.display_infrastructure_info()
+        
+    def display_infrastructure_info(self):
+        """Display gateway ID, runtime ID, and MCP tools information."""
+        print("🏗️  Prometheus Agent Infrastructure Information")
+        print("=" * 50)
+        
+        # Get and display Gateway ID
+        try:
+            gateway_id = get_ssm_parameter("/app/prometheusagent/agentcore/gateway_id")
+            if gateway_id:
+                print(f"🌐 Gateway ID: {gateway_id}")
+                
+                # Get gateway details
+                try:
+                    gateway_response = self.gateway_client.get_gateway(gatewayIdentifier=gateway_id)
+                    gateway_url = gateway_response.get("gatewayUrl", "Unknown")
+                    gateway_name = gateway_response.get("name", "Unknown")
+                    gateway_status = gateway_response.get("status", "Unknown")
+                    
+                    print(f"📛 Gateway Name: {gateway_name}")
+                    print(f"🔗 Gateway URL: {gateway_url}")
+                    print(f"📊 Gateway Status: {gateway_status}")
+                    
+                    # Try to get MCP tools from the gateway
+                    self.display_mcp_tools_info(gateway_id)
+                    
+                except Exception as e:
+                    print(f"⚠️  Could not retrieve gateway details: {e}")
+            else:
+                print("❌ Gateway ID not found in SSM")
+        except Exception as e:
+            print(f"⚠️  Could not retrieve gateway ID: {e}")
+        
+        # Get and display Runtime ARN
+        runtime_arn = self.get_agent_runtime_arn()
+        if runtime_arn and "ACCOUNT_ID" not in runtime_arn:
+            # Extract runtime ID from ARN
+            runtime_id = runtime_arn.split("/")[-1] if "/" in runtime_arn else "Unknown"
+            print(f"🚀 Runtime ID: {runtime_id}")
+            print(f"📋 Runtime ARN: {runtime_arn}")
+        
+        print("📋 Summary:")
+        print(f"   • Gateway: {'✅ Connected' if gateway_id else '❌ Not configured'}")
+        print(f"   • Runtime: {'✅ Available' if runtime_arn and 'ACCOUNT_ID' not in runtime_arn else '❌ Not configured'}")
+        print(f"   • MCP Tools: Available via AgentCore Gateway")
+        print()
+    
+    def display_mcp_tools_info(self, gateway_id):
+        """Display information about MCP tools available through the gateway."""
+        try:
+            # Import MCP client components to test gateway connection
+            from strands.tools.mcp import MCPClient
+            from mcp.client.streamable_http import streamablehttp_client
+            from utils import get_cognito_client_secret
+            
+            # Get authentication token
+            from agent import get_token
+            gateway_access_token = get_token(
+                get_ssm_parameter("/app/prometheusagent/agentcore/machine_client_id"),
+                get_cognito_client_secret(),
+                get_ssm_parameter("/app/prometheusagent/agentcore/cognito_auth_scope"),
+                get_ssm_parameter("/app/prometheusagent/agentcore/cognito_token_url")
+            )
+            
+            if 'access_token' in gateway_access_token:
+                # Get gateway URL
+                gateway_response = self.gateway_client.get_gateway(gatewayIdentifier=gateway_id)
+                gateway_url = gateway_response.get("gatewayUrl")
+                
+                # Create MCP client
+                mcp_client = MCPClient(
+                    lambda: streamablehttp_client(
+                        gateway_url,
+                        headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
+                    )
+                )
+                
+                # Start client and get tools
+                mcp_client.start()
+                tools = mcp_client.list_tools_sync()
+                
+                print(f"🔧 AgentCore Gateway MCP Tools:")
+                if isinstance(tools, dict) and 'tools' in tools:
+                    tools_list = tools['tools']
+                elif isinstance(tools, list):
+                    tools_list = tools
+                else:
+                    tools_list = []
+                
+                if tools_list:
+                    print(f"   📊 Total Tools: {len(tools_list)}")
+                    for i, tool in enumerate(tools_list, 1):
+                        # Try different ways to get tool name and description
+                        tool_name = "Unknown Tool"
+                        tool_desc = "No description available"
+                        
+                        # Check if it's an MCP tool object
+                        if hasattr(tool, 'name'):
+                            tool_name = tool.name
+                        elif hasattr(tool, '_name'):
+                            tool_name = tool._name
+                        elif hasattr(tool, 'tool_name'):
+                            tool_name = tool.tool_name
+                        
+                        # Check for description
+                        if hasattr(tool, 'description'):
+                            tool_desc = tool.description
+                        elif hasattr(tool, '_description'):
+                            tool_desc = tool._description
+                        elif hasattr(tool, 'tool_description'):
+                            tool_desc = tool.tool_description
+                        
+                        # If it's a dict-like object, try to extract info
+                        if hasattr(tool, '__dict__'):
+                            tool_dict = tool.__dict__
+                            if 'name' in tool_dict:
+                                tool_name = tool_dict['name']
+                            if 'description' in tool_dict:
+                                tool_desc = tool_dict['description']
+                        
+                        print(f"   {i}. {tool_name}")
+                        if tool_desc and tool_desc != 'No description available' and len(tool_desc.strip()) > 0:
+                            print(f"      └─ {tool_desc[:80]}{'...' if len(tool_desc) > 80 else ''}")
+                else:
+                    print("   ❌ No MCP tools found")
+                
+                # Cleanup
+                try:
+                    mcp_client.stop(None, None, None)
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"🔧 AgentCore Gateway MCP Tools: ❌ Could not retrieve ({str(e)[:50]}...)")
+    
     def get_agent_runtime_arn(self):
         """Get the agent runtime ARN for Prometheus Agent from environment variable."""
         # Get Prometheus Agent runtime ARN from environment variable
         arn = os.getenv("PROMETHEUS_AGENT_RUNTIME_ARN", "arn:aws:bedrock-agentcore:us-east-1:ACCOUNT_ID:runtime/prometheus_agent-RUNTIME_ID")
-        print(f"✅ Using Prometheus agent runtime ARN: {arn}")
-        return arn
-        
         return arn
     
     def invoke_agent(self, prompt, session_id=None):
@@ -71,6 +206,7 @@ class AgentRuntimeInvoker:
             print(f"🚀 Invoking agent...")
             print(f"   Prompt: {prompt}")
             print(f"   Session: {session_id}")
+            print(f"   Runtime: {agent_runtime_arn.split('/')[-1] if '/' in agent_runtime_arn else 'Unknown'}")
             
             # Invoke the agent
             response = self.client.invoke_agent_runtime(

@@ -1,0 +1,111 @@
+[
+    {
+      "description": "List all available Prometheus workspaces in the specified region",
+      "inputSchema": {
+        "properties": {
+          "region": {
+            "description": "AWS region (optional, defaults to current region)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "GetAvailableWorkspaces"
+    },
+    {
+      "description": "Execute instant PromQL queries against Prometheus",
+      "inputSchema": {
+        "properties": {
+          "workspace_id": {
+            "description": "The Prometheus workspace ID",
+            "type": "string"
+          },
+          "query": {
+            "description": "The PromQL query to execute",
+            "type": "string"
+          },
+          "time": {
+            "description": "Optional timestamp for query evaluation",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["workspace_id", "query"],
+        "type": "object"
+      },
+      "name": "ExecuteQuery"
+    },
+    {
+      "description": "Execute PromQL queries over a time range",
+      "inputSchema": {
+        "properties": {
+          "workspace_id": {
+            "description": "The Prometheus workspace ID",
+            "type": "string"
+          },
+          "query": {
+            "description": "The PromQL query to execute",
+            "type": "string"
+          },
+          "start": {
+            "description": "Start timestamp",
+            "type": "string"
+          },
+          "end": {
+            "description": "End timestamp",
+            "type": "string"
+          },
+          "step": {
+            "description": "Query resolution step width",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["workspace_id", "query", "start", "end", "step"],
+        "type": "object"
+      },
+      "name": "ExecuteRangeQuery"
+    },
+    {
+      "description": "Retrieve all available metric names from Prometheus",
+      "inputSchema": {
+        "properties": {
+          "workspace_id": {
+            "description": "The Prometheus workspace ID",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["workspace_id"],
+        "type": "object"
+      },
+      "name": "ListMetrics"
+    },
+    {
+      "description": "Retrieve server configuration details",
+      "inputSchema": {
+        "properties": {
+          "workspace_id": {
+            "description": "The Prometheus workspace ID",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["workspace_id"],
+        "type": "object"
+      },
+      "name": "GetServerInfo"
+    }
+  ]

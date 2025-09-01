@@ -15,8 +15,8 @@ from datetime import datetime
 
 # Add parent directory to path to import utils
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Removed get_ssm_parameter import - using environment variables
 from agent import AgentConfig
+from utils import get_ssm_parameter, get_cognito_client_secret
 
 # Load environment variables from .env.agents file
 try:
@@ -39,6 +39,8 @@ class StreamlitAgentInterface:
     def __init__(self):
         self.region = "us-east-1"
         self.client = boto3.client('bedrock-agentcore', region_name=self.region)
+        self.gateway_client = boto3.client('bedrock-agentcore-control', region_name=self.region)
+        self._mcp_tools_cache = None
         
     def get_agent_runtime_arn(self):
         """Get the agent runtime ARN for EKS Agent from environment variable."""
@@ -47,8 +49,15 @@ class StreamlitAgentInterface:
         return arn
     
     def get_agent_gateway_id(self):
-        """Get the agent gateway ID for EKS Agent from environment variable."""
-        # Get EKS Agent gateway ID from environment variable
+        """Get the agent gateway ID for EKS Agent from SSM parameter."""
+        try:
+            gateway_id = get_ssm_parameter("/app/eksagent/agentcore/gateway_id")
+            if gateway_id:
+                return gateway_id
+        except Exception:
+            pass
+        
+        # Fallback to environment variable
         gateway_id = os.getenv("EKS_AGENT_GATEWAY_ID", "eks-agent-agentcore-gw-GATEWAY_ID")
         return gateway_id
     
@@ -73,6 +82,122 @@ class StreamlitAgentInterface:
             "gateway_id": gateway_id,
             "gateway_status": gateway_status
         }
+    
+    def get_mcp_tools_info(self):
+        """Get information about MCP tools available through the AgentCore Gateway."""
+        if self._mcp_tools_cache is not None:
+            return self._mcp_tools_cache
+        
+        try:
+            gateway_id = self.get_agent_gateway_id()
+            if not gateway_id or "GATEWAY_ID" in gateway_id:
+                self._mcp_tools_cache = {"status": "error", "message": "Gateway not configured", "tools": []}
+                return self._mcp_tools_cache
+            
+            # Get gateway details
+            gateway_response = self.gateway_client.get_gateway(gatewayIdentifier=gateway_id)
+            gateway_url = gateway_response.get("gatewayUrl")
+            gateway_status = gateway_response.get("status", "Unknown")
+            
+            if gateway_status != "READY":
+                self._mcp_tools_cache = {"status": "error", "message": f"Gateway not ready: {gateway_status}", "tools": []}
+                return self._mcp_tools_cache
+            
+            # Try to get authentication token and connect to MCP
+            from strands.tools.mcp import MCPClient
+            from mcp.client.streamable_http import streamablehttp_client
+            from agent import get_token
+            
+            gateway_access_token = get_token(
+                get_ssm_parameter("/app/eksagent/agentcore/machine_client_id"),
+                get_cognito_client_secret(),
+                get_ssm_parameter("/app/eksagent/agentcore/cognito_auth_scope"),
+                get_ssm_parameter("/app/eksagent/agentcore/cognito_token_url")
+            )
+            
+            if 'access_token' not in gateway_access_token:
+                self._mcp_tools_cache = {"status": "error", "message": "Authentication failed", "tools": []}
+                return self._mcp_tools_cache
+            
+            # Create MCP client
+            mcp_client = MCPClient(
+                lambda: streamablehttp_client(
+                    gateway_url,
+                    headers={"Authorization": f"Bearer {gateway_access_token['access_token']}"},
+                )
+            )
+            
+            # Start client and get tools
+            mcp_client.start()
+            tools = mcp_client.list_tools_sync()
+            
+            # Process tools
+            tools_list = []
+            if isinstance(tools, dict) and 'tools' in tools:
+                raw_tools = tools['tools']
+            elif isinstance(tools, list):
+                raw_tools = tools
+            else:
+                raw_tools = []
+            
+            for tool in raw_tools:
+                # Use the exact same logic as invoke_runtime.py
+                tool_name = "Unknown Tool"
+                tool_desc = "No description available"
+                
+                # Check if it's an MCP tool object
+                if hasattr(tool, 'name'):
+                    tool_name = tool.name
+                elif hasattr(tool, '_name'):
+                    tool_name = tool._name
+                elif hasattr(tool, 'tool_name'):
+                    tool_name = tool.tool_name
+                
+                # Check for description
+                if hasattr(tool, 'description'):
+                    tool_desc = tool.description
+                elif hasattr(tool, '_description'):
+                    tool_desc = tool._description
+                elif hasattr(tool, 'tool_description'):
+                    tool_desc = tool.tool_description
+                
+                # If it's a dict-like object, try to extract info
+                if hasattr(tool, '__dict__'):
+                    tool_dict = tool.__dict__
+                    if 'name' in tool_dict:
+                        tool_name = tool_dict['name']
+                    if 'description' in tool_dict:
+                        tool_desc = tool_dict['description']
+                
+                tool_info = {
+                    "name": tool_name,
+                    "description": tool_desc if tool_desc != "No description available" else "No description available"
+                }
+                
+                tools_list.append(tool_info)
+            
+            # Cleanup
+            try:
+                mcp_client.stop(None, None, None)
+            except:
+                pass
+            
+            self._mcp_tools_cache = {
+                "status": "success",
+                "gateway_url": gateway_url,
+                "gateway_status": gateway_status,
+                "tools": tools_list,
+                "total_tools": len(tools_list)
+            }
+            
+        except Exception as e:
+            self._mcp_tools_cache = {
+                "status": "error", 
+                "message": f"Failed to retrieve MCP tools: {str(e)[:100]}...",
+                "tools": []
+            }
+        
+        return self._mcp_tools_cache
     
     def invoke_agent(self, prompt, session_id=None):
         """Invoke the agent with a prompt."""
@@ -173,6 +298,65 @@ def main():
     # Sidebar
     with st.sidebar:
         st.header("🛠️ Agent Controls")
+        
+        # AgentCore Runtime & Gateway Information
+        st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
+        st.subheader("🏗️ AgentCore Configuration")
+        
+        # Get runtime and gateway info
+        runtime_info = st.session_state.agent_interface.get_runtime_info()
+        
+        # Display Runtime Information
+        st.markdown("**🚀 Runtime:**")
+        st.text(f"Status: {runtime_info['runtime_status']}")
+        st.text(f"ID: {runtime_info['runtime_id']}")
+        
+        # Display Gateway Information  
+        st.markdown("**🌐 Gateway:**")
+        st.text(f"Status: {runtime_info['gateway_status']}")
+        st.text(f"ID: {runtime_info['gateway_id']}")
+        
+        # Show full ARN in expander for technical details
+        with st.expander("🔍 Technical Details"):
+            st.code(f"Runtime ARN:\n{runtime_info['runtime_arn']}", language="text")
+            st.code(f"Gateway ID:\n{runtime_info['gateway_id']}", language="text")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # MCP Tools Information
+        st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)
+        st.subheader("🔧 AgentCore Gateway MCP Tools")
+        
+        # Get MCP tools info
+        mcp_info = st.session_state.agent_interface.get_mcp_tools_info()
+        
+        if mcp_info["status"] == "success":
+            st.success(f"✅ Connected - {mcp_info['total_tools']} tools available")
+            
+            # Show tools in an expander
+            with st.expander(f"📋 View {mcp_info['total_tools']} MCP Tools"):
+                for i, tool in enumerate(mcp_info["tools"], 1):
+                    # Make tool names more readable by replacing underscores
+                    display_name = tool['name'].replace('___', ' → ').replace('_', ' ').title()
+                    st.markdown(f"**{i}. {display_name}**")
+                    st.code(tool['name'], language="text")  # Show original name in code block
+                    if tool['description'] and tool['description'] != "No description available":
+                        st.caption(tool['description'][:150] + ("..." if len(tool['description']) > 150 else ""))
+                    if i < len(mcp_info["tools"]):  # Don't add separator after last item
+                        st.markdown("---")
+            
+            # Gateway status
+            st.caption(f"Gateway Status: {mcp_info.get('gateway_status', 'Unknown')}")
+            
+        elif mcp_info["status"] == "error":
+            st.error(f"❌ {mcp_info.get('message', 'MCP tools unavailable')}")
+            
+            # Add refresh button
+            if st.button("🔄 Refresh MCP Tools"):
+                st.session_state.agent_interface._mcp_tools_cache = None
+                st.rerun()
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Session information
         st.markdown('<div class="sidebar-content">', unsafe_allow_html=True)

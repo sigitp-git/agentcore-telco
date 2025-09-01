@@ -245,7 +245,53 @@ All SSM parameters now use the `/app/eksagent/` prefix:
 ## Prometheus Agent Improvements
 
 ### Overview
-The Prometheus agent has been enhanced with optimized model settings, improved MCP error handling, and robust resource management for better performance and reliability in monitoring and observability tasks.
+The Prometheus agent has been enhanced with optimized model settings, improved MCP error handling, robust resource management, and a complete refactoring to MCP-only architecture for better performance and reliability in monitoring and observability tasks.
+
+### Latest: MCP-Only Architecture Refactoring (September 2025)
+
+#### Complete Architecture Transformation
+The Prometheus agent has been successfully refactored to implement the same MCP-only architecture improvements that were applied to the VPC, Outposts, and EKS agents:
+
+**Removed Hardcoded boto3 Tools:**
+- `list_eks_clusters()` - Removed completely (was incorrectly included in Prometheus agent)
+- `aws_resource_guidance()` - Removed completely  
+- `eks_tool_guidance()` - Removed completely (was incorrectly included in Prometheus agent)
+
+**Updated create_tools_list():**
+- Now only includes MCP-based and websearch tools
+- Removed references to hardcoded boto3 tools
+- Maintains AgentCore Gateway MCP and AWS MCP integration
+
+**Enhanced System Prompt:**
+Added "TOOL USAGE" section explaining MCP-only architecture:
+```
+TOOL USAGE:
+- All AWS operations use MCP tools exclusively (AgentCore Gateway + AWS MCP servers)
+- Use websearch for latest Prometheus and AWS documentation
+- Use MCP management tools to discover available AWS service tools
+```
+
+**Fixed MCP Configuration Logic:**
+- Updated `load_mcp_config()` to properly handle AgentCore Gateway vs AWS MCP modes
+- Improved error messages for better user experience
+- Added clear distinction between different MCP modes
+
+**Cleaned Up User-Facing Text:**
+- Removed 'stdio' references from user messages
+- Updated cleanup method descriptions to remove technical jargon
+- Improved MCP server discovery messages
+
+**Updated Help Text:**
+- Added line about MCP-only architecture: "All AWS operations use MCP tools exclusively"
+- Maintained existing MCP management tool descriptions
+
+#### Architecture Consistency
+All four agents (VPC, Outposts, EKS, Prometheus) now have:
+- ✅ **Identical MCP-only architecture**
+- ✅ **Consistent configuration logic**
+- ✅ **Unified tool discovery and help systems**
+- ✅ **Clean user-facing interfaces**
+- ✅ **Specialized system prompts for their respective domains**
 
 ### Key Improvements Added
 
@@ -265,7 +311,7 @@ The Prometheus agent has been enhanced with optimized model settings, improved M
 - **Enhanced Error Handling**: Clean error messages for MCP tool failures
 - **Response Format Handling**: Properly handles empty dicts, None responses, and various formats
 - **Timeout Management**: Prevents hanging during MCP client initialization
-- **Resource Cleanup**: Proper cleanup of stdio processes and connections
+- **Resource Cleanup**: Proper cleanup of processes and connections
 
 ### Prometheus Agent Exit Hang Fix
 

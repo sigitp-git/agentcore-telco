@@ -326,42 +326,47 @@ The AWS AgentCore Telco project implements a multi-agent architecture designed f
 
 ### Agent Capabilities
 
+**🏗️ All agents now use identical MCP-only architecture for consistent, scalable operations**
+
 #### EKS Agent
-- **Cluster Management**: Create, configure, and manage EKS clusters
-- **Node Group Operations**: Manage worker nodes and auto-scaling
-- **Troubleshooting**: Diagnose and resolve EKS-related issues with enhanced error handling
-- **Security**: Configure RBAC, security groups, and IAM roles
-- **Monitoring**: Integration with CloudWatch and container insights
-- **MCP Integration**: 16 specialized EKS tools for Kubernetes operations
-- **Memory Management**: EKS-specific context retention and conversation history
-- **Resource Cleanup**: Proper cleanup prevents resource leaks and hanging processes
+- **Cluster Management**: Create, configure, and manage EKS clusters with advanced configuration
+- **Node Group Operations**: Manage worker nodes, scaling policies, and instance types
+- **MCP-Only Architecture**: All AWS operations use MCP tools exclusively (AgentCore Gateway + AWS MCP servers)
+- **Kubernetes Integration**: Deploy applications, manage services, and troubleshoot workloads
+- **Security Configuration**: RBAC, security groups, and IAM role management
+- **Monitoring Setup**: CloudWatch integration and logging configuration
+- **Troubleshooting**: Diagnose cluster issues, pod failures, and networking problems
+- **Cost Optimization**: Right-sizing recommendations and resource efficiency analysis
+- **Enhanced Reliability**: Robust error handling with timeout protection and graceful exit
 
 #### VPC Agent
-- **Network Architecture**: Design and implement VPC topologies
-- **Connectivity**: Configure VPN, Direct Connect, and peering
-- **Security Groups**: Manage firewall rules and network ACLs
-- **Routing**: Configure route tables and traffic flow
-- **Troubleshooting**: Network connectivity and performance issues
-- **Cross-Agent Integration**: Collaborate with EKS and Outposts agents for network analysis
+- **Network Architecture**: Design and implement VPC topologies with MCP-only operations
+- **Connectivity**: Configure VPN, Direct Connect, and peering through AWS MCP tools
+- **Security Groups**: Manage firewall rules and network ACLs with enhanced automation
+- **Routing**: Configure route tables and traffic flow optimization
+- **Troubleshooting**: Network connectivity and performance issue resolution
+- **Cross-Agent Integration**: Collaborate with EKS and Outposts agents for comprehensive analysis
+- **MCP-Only Architecture**: All AWS operations use MCP tools exclusively for better scalability
 
 #### Outposts Agent
-- **Hybrid Infrastructure**: Manage on-premises AWS Outposts
-- **Capacity Planning**: Monitor and optimize resource utilization
-- **Connectivity**: Ensure reliable connection to AWS regions
-- **Local Services**: Configure and manage local AWS services
-- **Maintenance**: Coordinate updates and maintenance windows
-- **Telco Integration**: Specialized support for 5G network functions
+- **Hybrid Infrastructure**: Manage on-premises AWS Outposts with MCP-based operations
+- **Capacity Planning**: Monitor and optimize resource utilization through AWS MCP tools
+- **Connectivity**: Ensure reliable connection to AWS regions with automated diagnostics
+- **Local Services**: Configure and manage local AWS services on Outposts
+- **Maintenance**: Coordinate updates and maintenance windows with enhanced scheduling
+- **Telco Integration**: Specialized support for 5G network functions and edge computing
+- **MCP-Only Architecture**: All AWS operations use MCP tools exclusively for consistency
 
 #### Prometheus Agent
 - **Metrics Collection**: Configure Prometheus data sources and Amazon Managed Prometheus
 - **Query Optimization**: Write and optimize PromQL queries with real-time execution
-- **MCP Integration**: 52 AWS MCP tools for comprehensive AWS service integration
+- **MCP-Only Architecture**: All AWS operations use MCP tools exclusively (AgentCore Gateway + AWS MCP servers)
 - **Workspace Management**: Automatic detection and management of Prometheus workspaces
 - **Real-time Queries**: Execute PromQL queries against live Prometheus instances
 - **Alerting**: Set up and manage alert rules and notification channels
 - **Visualization**: Integration with Grafana and custom dashboards
 - **Troubleshooting**: Diagnose monitoring, alerting, and MCP integration issues
-- **AWS Services**: Direct integration with EKS, CloudWatch, and AWS documentation
+- **AWS Services**: Direct integration with EKS, CloudWatch, and AWS documentation through MCP tools
 - **Enhanced Reliability**: Robust error handling with timeout protection and graceful exit
 
 ### Telco Multi-Agent Collaboration Pattern
@@ -574,9 +579,29 @@ streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 
 ## 📋 Version History & Agent Improvements
 
-### Latest (August 2025)
+**🎉 PROJECT MILESTONE: MCP-Only Architecture Completed (September 2025)**
 
-#### ✨ New Features
+All four agents (VPC, Outposts, EKS, Prometheus) have been successfully refactored to use identical MCP-only architecture, providing consistent, scalable, and maintainable AWS operations across the entire telco agent ecosystem.
+
+### Latest (September 2025)
+
+#### 🏗️ MCP-Only Architecture Completion ✅
+- **Complete Architecture Refactoring**: All four agents (VPC, Outposts, EKS, Prometheus) now use identical MCP-only architecture
+  - ✅ **Removed all hardcoded boto3 tools** from all agents (`list_eks_clusters`, `aws_resource_guidance`, `eks_tool_guidance`)
+  - ✅ **All AWS operations use MCP tools exclusively** (AgentCore Gateway + AWS MCP servers)
+  - ✅ **Consistent tool discovery and help systems** across all agents with unified `/tools` command
+  - ✅ **Enhanced error handling** with user-friendly messages and clean MCP integration
+  - ✅ **Updated system prompts** for all agents to reflect MCP-only architecture
+  - ✅ **Fixed MCP configuration logic** distinguishing AgentCore Gateway vs AWS MCP modes
+  - ✅ **Cleaned user-facing text** removing technical 'stdio' references
+- **Architecture Benefits Achieved**: 
+  - **Better Scalability**: New AWS services automatically available through MCP servers
+  - **Improved Maintainability**: No hardcoded AWS SDK calls to maintain across 4 agents
+  - **Enhanced User Experience**: Clean error messages, tool discovery, and consistent interfaces
+  - **Future-Proof Design**: Ready for new MCP servers and AWS services without code changes
+  - **Architectural Consistency**: All agents follow identical patterns for reliability
+
+#### ✨ Previous Features (August 2025)
 - **Standardized Runtime Deployment**: Complete `deploy_runtime.py` system across all agents
   - Automated ECR repository management with creation when needed
   - Docker build and push with comprehensive error handling

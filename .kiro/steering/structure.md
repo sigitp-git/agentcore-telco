@@ -159,6 +159,49 @@ def setup_memory():
     return memory_id, memory_client
 ```
 
+### MCP-Only Architecture (September 2025) ✅ COMPLETED
+All four agents (VPC, Outposts, EKS, Prometheus) now use this standardized pattern:
+
+```python
+def create_tools_list():
+    """Create the list of tools for the agent - MCP-only architecture."""
+    tools_list = [
+        websearch, 
+        list_mcp_tools, 
+        list_aws_mcp_tools,
+        list_mcp_server_names,
+        manage_mcp_config,
+        list_mcp_servers_from_config,
+        show_available_mcp_servers
+    ]
+    
+    # Add AgentCore Gateway MCP tools if available
+    if mcp_client:
+        try:
+            mcp_tools = get_full_tools_list(mcp_client)
+            tools_list.extend(mcp_tools)
+            print(f"✅ Added {len(mcp_tools)} AgentCore Gateway MCP tools")
+        except Exception as e:
+            # Enhanced error handling with clean user messages
+    
+    # Add AWS MCP tools if available
+    if aws_mcp_manager:
+        try:
+            aws_tools = aws_mcp_manager.get_all_aws_tools()
+            tools_list.extend(aws_tools)
+            print(f"✅ Added {len(aws_tools)} AWS MCP tools")
+        except Exception as e:
+            # Enhanced error handling with clean user messages
+    
+    return tools_list
+```
+
+**Key Achievements:**
+- ✅ **Removed hardcoded boto3 tools** from all agents
+- ✅ **Consistent architecture** across VPC, Outposts, EKS, and Prometheus agents
+- ✅ **Enhanced error handling** with user-friendly messages
+- ✅ **Clean user interfaces** removing technical 'stdio' references
+
 ### Tool Definitions
 ```python
 @tool

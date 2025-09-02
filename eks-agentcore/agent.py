@@ -394,6 +394,7 @@ TOOL USAGE:
 - All AWS operations use MCP tools exclusively (AgentCore Gateway + AWS MCP servers)
 - Use websearch for latest Kubernetes and AWS documentation
 - Use MCP management tools to discover available AWS service tools
+- Use list_resources tool when asked to list EKS clusters
 
 CRITICAL EFFICIENCY RULES:
 - Answer from knowledge FIRST before using tools

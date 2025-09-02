@@ -150,6 +150,9 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# mcp
+mcp.json
+
 # Pyre type checker
 .pyre/
 

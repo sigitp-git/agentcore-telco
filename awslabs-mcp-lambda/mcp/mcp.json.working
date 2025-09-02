@@ -1,0 +1,131 @@
+{
+    "mcpServers": {
+        "awslabs.core-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.core-mcp-server@latest"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": []
+        },
+        "awslabs.aws-documentation-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.aws-documentation-mcp-server@latest"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "search_documentation",
+                "read_documentation"
+            ]
+        },
+        "awslabs.eks-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.eks-mcp-server@latest",
+                "--allow-write",
+                "--allow-sensitive-data-access"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "list_k8s_resources"
+            ]
+        },
+        "awslabs.prometheus-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.prometheus-mcp-server@latest",
+                "--url",
+                "https://aps-workspaces.us-east-1.amazonaws.com/workspaces/[WS-ID]",
+                "--region",
+                "us-east-1"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "GetAvailableWorkspaces",
+                "ListMetrics",
+                "ExecuteQuery",
+                "ExecuteRangeQuery",
+                "GetServerInfo"
+            ]
+        },
+        "aws-knowledge-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "mcp-proxy",
+                "--transport",
+                "streamablehttp",
+                "https://knowledge-mcp.global.api.aws"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "FASTMCP_LOG_LEVEL": "ERROR"
+            },
+            "disabled": false,
+            "autoApprove": [
+                "aws___read_documentation"
+            ]
+        },
+        "awslabs.cloudwatch-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.cloudwatch-mcp-server@latest"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": []
+        },
+        "awslabs.ccapi-mcp-server": {
+            "command": "uvx",
+            "args": [
+                "awslabs.ccapi-mcp-server@latest"
+            ],
+            "env": {
+                "UV_LOG_LEVEL": "error",
+                "UV_QUIET": "1",
+                "DEFAULT_TAGS": "enabled",
+                "SECURITY_SCANNING": "enabled",
+                "FASTMCP_LOG_LEVEL": "ERROR",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_REGION": "us-east-1"
+            },
+            "disabled": false,
+            "autoApprove": []
+        }
+    }
+}

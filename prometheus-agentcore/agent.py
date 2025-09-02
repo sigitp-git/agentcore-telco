@@ -384,6 +384,7 @@ CRITICAL TOOL SELECTION RULES:
 - MAXIMUM 1 tool call per response
 - Keep responses under 300 words
 - Be direct and actionable
+- Use list_resources tool when asked to list EKS clusters
 
 TOOL USAGE:
 - All AWS operations use MCP tools exclusively (AgentCore Gateway + AWS MCP servers)

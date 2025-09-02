@@ -1,0 +1,21 @@
+Q!> Follow this pattern: https://raw.githubusercontent.com/sigitp-git/agentcore-telco/refs/heads/main/awslabs-mcp-lambda/lambda_handlers_q/prometheus-mcp-server/lambda_function.py to create Lambda function implementation of stdio MCP server: https://github.com/awslabs/mcp/tree/main/src/ccapi-mcp-server so that it can be run on AWS Lambda has a target for Bedrock AgentCore
+Gateway
+
+> The Lambda function is now created following the exact pattern from the Prometheus MCP server. Here's what it does:
+
+Key Components:
+• Uses StdioServerParameters to configure the CCAPI MCP server module (awslabs.ccapi_mcp_server.server)
+• Passes AWS credentials from the Lambda execution role to the MCP server
+• Handles tool name extraction from the event or context for Bedrock AgentCore Gateway
+• Uses the same handler chain: StdioServerAdapterRequestHandler → BedrockAgentCoreGatewayTargetHandler
+
+Minimal Changes from Pattern:
+• Changed the module path from awslabs.prometheus_mcp_server.server to awslabs.ccapi_mcp_server.server
+• All other logic remains identical to ensure compatibility with Bedrock AgentCore Gateway
+
+This implementation allows the CCAPI MCP server to run as a Lambda function target for Bedrock AgentCore Gateway, providing AWS Cloud Control API functionality through the MCP protocol.
+
+!>
+
+NOTE:
+lambda_function.py and requirements.txt created in this GitHub folder from GitHub MCP server running on Amazon queries

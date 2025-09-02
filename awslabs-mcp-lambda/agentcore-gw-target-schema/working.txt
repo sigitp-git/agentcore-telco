@@ -1,0 +1,28 @@
+#########
+Q!> create bedrock agentcore gateway target handler schema for these prometheus mcp server tools:
+(from the MCP tool github)
+
+GetAvailableWorkspaces
+List all available Prometheus workspaces in the specified region
+Parameters: region (optional)
+Returns: List of workspaces with IDs, aliases, and status
+
+ExecuteQuery
+Execute instant PromQL queries against Prometheus
+Parameters: workspace_id (required), query (required), time (optional), region (optional)
+ExecuteRangeQuery
+
+Execute PromQL queries over a time range
+Parameters: workspace_id (required), query, start time, end time, step interval, region (optional)
+ListMetrics
+
+Retrieve all available metric names from Prometheus
+Parameters: workspace_id (required), region (optional)
+Returns: Sorted list of metric names
+
+GetServerInfo
+Retrieve server configuration details
+Parameters: workspace_id (required), region (optional)
+Returns: URL, region, profile, and service information
+
+Follow this format: https://raw.githubusercontent.com/sigitp-git/agentcore-telco/refs/heads/main/awslabs-mcp-lambda/agentcore-gw-target-schema/awsdocsmcp.json for the JSON file structure

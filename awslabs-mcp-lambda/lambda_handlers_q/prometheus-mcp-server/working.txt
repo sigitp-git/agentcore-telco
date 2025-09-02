@@ -1,0 +1,134 @@
+ubuntu@cloud9-sigitp2:~/environment/agentcore/mcp-stdio-awslabs-lambda/prometheus-lambda-working$ pwd
+/home/ubuntu/environment/agentcore/mcp-stdio-awslabs-lambda/prometheus-lambda-working
+
+ubuntu@cloud9-sigitp2:~/environment/agentcore/mcp-stdio-awslabs-lambda/prometheus-lambda-working$ ls -la
+total 24968
+drwxrwxr-x 114 ubuntu ubuntu     4096 Sep  2 00:09 .
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:08 ..
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 __pycache__
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 aiobotocore
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 aiobotocore-2.24.1.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 aiohappyeyeballs
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 aiohappyeyeballs-2.6.1.dist-info
+drwxrwxr-x   5 ubuntu ubuntu     4096 Sep  2 00:09 aiohttp
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 aiohttp-3.12.15.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 aioitertools
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 aioitertools-0.12.0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 aiosignal
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 aiosignal-1.4.0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 annotated_types
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 annotated_types-0.7.0.dist-info
+drwxrwxr-x   7 ubuntu ubuntu     4096 Sep  2 00:09 anyio
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 anyio-4.10.0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 attr
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 attrs
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 attrs-25.3.0.dist-info
+drwxrwxr-x  12 ubuntu ubuntu     4096 Sep  2 00:09 aws_lambda_powertools
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 aws_lambda_powertools-3.19.0.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 awslabs
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 awslabs_prometheus_mcp_server-0.2.5.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 bin
+drwxrwxr-x  10 ubuntu ubuntu     4096 Sep  2 00:09 boto3
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 boto3-1.39.11.dist-info
+drwxrwxr-x   8 ubuntu ubuntu     4096 Sep  2 00:09 botocore
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 botocore-1.39.11.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 certifi
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 certifi-2025.8.3.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 charset_normalizer
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 charset_normalizer-3.4.3.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 click
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 click-8.2.1.dist-info
+drwxrwxr-x   6 ubuntu ubuntu     4096 Sep  2 00:09 dateutil
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 dotenv
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 frozenlist
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 frozenlist-1.7.0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 h11
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 h11-0.16.0.dist-info
+drwxrwxr-x   6 ubuntu ubuntu     4096 Sep  2 00:09 httpcore
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 httpcore-1.0.9.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 httpx
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 httpx-0.28.1.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 httpx_sse
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 httpx_sse-0.4.1.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 idna
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 idna-3.10.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 jmespath
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 jmespath-1.0.1.dist-info
+drwxrwxr-x   5 ubuntu ubuntu     4096 Sep  2 00:09 jsonschema
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 jsonschema-4.25.1.dist-info
+drwxrwxr-x   5 ubuntu ubuntu     4096 Sep  2 00:09 jsonschema_specifications
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 jsonschema_specifications-2025.4.1.dist-info
+-rw-rw-r--   1 ubuntu ubuntu 24888146 Sep  2 00:09 lambda_complete.zip
+-rw-rw-r--   1 ubuntu ubuntu     2037 Sep  2 00:09 lambda_function.py
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 loguru
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 loguru-0.7.3.dist-info
+drwxrwxr-x  10 ubuntu ubuntu     4096 Sep  2 00:09 markdown_it
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 markdown_it_py-4.0.0.dist-info
+drwxrwxr-x   8 ubuntu ubuntu     4096 Sep  2 00:09 mcp
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 mcp-1.13.1.dist-info
+drwxrwxr-x   6 ubuntu ubuntu     4096 Sep  2 00:09 mcp_lambda
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 mdurl
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 mdurl-0.1.2.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 multidict
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 multidict-6.6.4.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 multipart
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 propcache
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 propcache-0.3.2.dist-info
+drwxrwxr-x   8 ubuntu ubuntu     4096 Sep  2 00:09 pydantic
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 pydantic-2.11.7.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 pydantic_core
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 pydantic_core-2.33.2.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 pydantic_settings
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 pydantic_settings-2.10.1.dist-info
+drwxrwxr-x   7 ubuntu ubuntu     4096 Sep  2 00:09 pygments
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 pygments-2.19.2.dist-info
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 python_dateutil-2.9.0.post0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 python_dotenv-1.1.1.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 python_multipart
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 python_multipart-0.0.20.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 referencing
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 referencing-0.36.2.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 requests
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 requests-2.32.5.dist-info
+-rw-rw-r--   1 ubuntu ubuntu       91 Sep  2 00:09 requirements.txt
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 rich
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 rich-14.1.0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 rpds
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 rpds_py-0.27.1.dist-info
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 run_mcp_servers_with_aws_lambda-0.4.2.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 s3transfer
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 s3transfer-0.13.1.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 shellingham
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 shellingham-1.5.4.dist-info
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 six-1.17.0.dist-info
+-rw-rw-r--   1 ubuntu ubuntu    34703 Sep  2 00:09 six.py
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 sniffio
+drwxrwxr-x   2 ubuntu ubuntu     4096 Sep  2 00:09 sniffio-1.3.1.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 sse_starlette
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 sse_starlette-3.0.2.dist-info
+drwxrwxr-x   4 ubuntu ubuntu     4096 Sep  2 00:09 starlette
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 starlette-0.47.3.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 typer
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 typer-0.17.3.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 typing_extensions-4.15.0.dist-info
+-rw-rw-r--   1 ubuntu ubuntu   160429 Sep  2 00:09 typing_extensions.py
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 typing_inspection
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 typing_inspection-0.4.1.dist-info
+drwxrwxr-x   6 ubuntu ubuntu     4096 Sep  2 00:09 urllib3
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 urllib3-2.5.0.dist-info
+drwxrwxr-x   8 ubuntu ubuntu     4096 Sep  2 00:09 uvicorn
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 uvicorn-0.35.0.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 wrapt
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 wrapt-1.17.3.dist-info
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 yarl
+drwxrwxr-x   3 ubuntu ubuntu     4096 Sep  2 00:09 yarl-1.20.1.dist-info
+ubuntu@cloud9-sigitp2:~/environment/agentcore/mcp-stdio-awslabs-lambda/prometheus-lambda-working$
+
+ubuntu@cloud9-sigitp2:~/environment/agentcore/mcp-stdio-awslabs-lambda/prometheus-lambda-working$ cat requirements.txt
+run-mcp-servers-with-aws-lambda==0.4.2
+awslabs.prometheus-mcp-server==0.2.5
+boto3==1.40.18
+ubuntu@cloud9-sigitp2:~/environment/agentcore/mcp-stdio-awslabs-lambda/prometheus-lambda-working$
+
+#########
+Q!> create a lambda function to run stdio mcp server: https://github.com/awslabs/mcp/tree/main/src/prometheus-mcp-server in aws lambda function using this library: https://github.com/awslabs/run-model-context-protocol-servers-with-aws-lambda, to be used as bedrock agentcore gateway target

@@ -15,8 +15,8 @@ def lambda_handler(event, context):
 
     # Server configuration with proper StdioServerParameters
     server_params = StdioServerParameters(
-        command="uvx",
-        args=["awslabs.aws-pricing-mcp-server@latest"],
+        command="python",
+        args=["-m", "awslabs.aws_pricing_mcp_server.server"],
         env={
             "FASTMCP_LOG_LEVEL": "ERROR",
             "AWS_REGION": "us-east-1",

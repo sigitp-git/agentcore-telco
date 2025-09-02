@@ -68,14 +68,23 @@ class McpLambdaStack(Stack):
             f"McpLambda{server_id.replace('-', '').title()}",
             function_name=function_name,
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="lambda_function.lambda_handler",
+            handler="lambda_handler",  # Just the function name, not the module path
             entry=f"lambda_handlers_q/{server_id}",
+            index="lambda_function.py",  # Specify the handler file name
             role=lambda_role,
             timeout=Duration.seconds(config.get('timeout', 60)),
             memory_size=config.get('memory', 1024),
             environment=env_vars,
             description=config.get('description', f"MCP Server: {config['name']}"),
             # PythonFunction automatically handles requirements.txt from lambda_handlers_q/{server_id}/
+        )
+        
+        # Add resource-based policy to allow bedrock-agentcore.amazonaws.com to invoke the function
+        lambda_function.add_permission(
+            f"AgentCoreGatewayInvoke{server_id.replace('-', '').title()}",
+            principal=iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+            action="lambda:InvokeFunction",
+            source_arn=None  # Allow from any AgentCore Gateway in this account
         )
         
         self.lambda_functions[server_id] = lambda_function

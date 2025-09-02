@@ -15,8 +15,8 @@ def lambda_handler(event, context):
 
     # Server configuration with proper StdioServerParameters
     server_params = StdioServerParameters(
-        command="uvx",
-        args=["mcp-server-git"],
+        command="python",
+        args=["-m", "mcp_server_git"],
         env={
 
             "AWS_DEFAULT_REGION": "us-east-1",

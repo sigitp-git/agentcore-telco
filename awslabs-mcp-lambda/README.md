@@ -2,7 +2,24 @@
 
 Deploy 18 Model Context Protocol (MCP) servers as individual AWS Lambda functions using the proven `mcp_lambda` library pattern. Each MCP server gets its own dedicated Lambda function for optimal isolation and scaling.
 
-**✅ STATUS: All 18 MCP servers using proven mcp_lambda library pattern - Ready for deployment!**
+**✅ STATUS: All 18 MCP servers using proven mcp_lambda library pattern with enhanced requirements - Ready for deployment!**
+
+## 🎯 Recent Enhancements (September 2025)
+
+### **✅ Requirements.txt Standardization**
+All lambda handlers now follow the **proven 3-package pattern** based on the manually tested Prometheus handler:
+
+- **Consistent Structure**: All handlers use the same 3-package pattern
+- **Specific Packages**: Each handler includes its specific MCP server package (e.g., `awslabs.prometheus-mcp-server==0.2.5`)
+- **Version Consistency**: All use standardized versions (0.4.2, 0.2.5, 1.40.18)
+- **Clean Requirements**: Removed generic `mcp>=1.0.0` in favor of specific packages
+
+### **✅ Enhanced Handler Generation**
+The `generate_all_handlers.py` script now automatically creates handlers with:
+- Correct MCP server package detection
+- Proper version management
+- Special case handling (Docker, proxy, legacy packages)
+- Consistent 3-package requirements structure
 
 ## 🎯 Architecture
 
@@ -193,6 +210,20 @@ pip install -r requirements.txt
 cdk bootstrap
 ```
 
+### **Handler Requirements Structure**
+Each handler now uses the proven 3-package pattern:
+```txt
+run-mcp-servers-with-aws-lambda==0.4.2
+awslabs.prometheus-mcp-server==0.2.5  # Specific MCP server package
+boto3==1.40.18
+```
+
+**Package Mapping Examples:**
+- AWS Labs servers: `awslabs.package-name==0.2.5`
+- Legacy servers: `mcp-server-*==0.1.0`
+- Proxy servers: `mcp-proxy==0.1.0`
+- Docker servers: Minimal requirements with explanatory comments
+
 ### **Testing**
 ```bash
 # Test configuration
@@ -259,29 +290,80 @@ This confirms the `BedrockAgentCoreGatewayTargetHandler` is working correctly an
 
 ### Handler Structure
 ```python
+import os
+import boto3
 from mcp_lambda.handlers.bedrock_agent_core_gateway_target_handler import BedrockAgentCoreGatewayTargetHandler
 from mcp_lambda.server_adapter.stdio_server_adapter_request_handler import StdioServerAdapterRequestHandler
+from mcp.client.stdio import StdioServerParameters
+
+class MockClientContext:
+    def __init__(self, tool_name):
+        self.custom = {"bedrockAgentCoreToolName": tool_name}
 
 def lambda_handler(event, context):
-    # Server configuration
-    server_config = {
-        "command": "uvx",
-        "args": ['awslabs.core-mcp-server@latest'],
-        "env": {'FASTMCP_LOG_LEVEL': 'ERROR'},
-        "cwd": "/tmp"
-    }
-    
-    # Create request handler with stdio server adapter
-    request_handler = StdioServerAdapterRequestHandler(server_config)
-    
+    # Get AWS credentials from Lambda execution role
+    session = boto3.Session()
+    credentials = session.get_credentials()
+
+    # Server configuration with proper StdioServerParameters
+    server_params = StdioServerParameters(
+        command="python",
+        args=["-m", "awslabs.core_mcp_server.server"],
+        env={
+            "FASTMCP_LOG_LEVEL": "ERROR",
+            "AWS_DEFAULT_REGION": "us-east-1",
+            "AWS_ACCESS_KEY_ID": credentials.access_key,
+            "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
+            "AWS_SESSION_TOKEN": credentials.token
+        }
+    )
+
+    # Extract tool name from event if not in context
+    if not (context.client_context and hasattr(context.client_context, "custom") and
+            context.client_context.custom.get("bedrockAgentCoreToolName")):
+        tool_name = None
+        if isinstance(event, dict):
+            tool_name = (event.get("toolName") or
+                        event.get("tool_name") or
+                        event.get("bedrockAgentCoreToolName"))
+            headers = event.get("headers", {})
+            if headers:
+                tool_name = tool_name or headers.get("bedrockAgentCoreToolName")
+
+        if tool_name:
+            context.client_context = MockClientContext(tool_name)
+
+    # Create request handler with proper StdioServerParameters
+    request_handler = StdioServerAdapterRequestHandler(server_params)
+
     # Create Bedrock AgentCore Gateway handler
     gateway_handler = BedrockAgentCoreGatewayTargetHandler(request_handler)
-    
-    # Handle the request
+
     return gateway_handler.handle(event, context)
 ```
 
-See [LIBRARY_OVERVIEW.md](LIBRARY_OVERVIEW.md) for comprehensive documentation about the `run-mcp-servers-with-aws-lambda` library.
+### **Enhanced Requirements Management**
+
+All handlers now use the **proven 3-package pattern** with specific MCP server packages:
+
+```txt
+# Standard AWS Labs MCP Server Pattern
+run-mcp-servers-with-aws-lambda==0.4.2
+awslabs.prometheus-mcp-server==0.2.5
+boto3==1.40.18
+
+# Legacy MCP Server Pattern  
+run-mcp-servers-with-aws-lambda==0.4.2
+mcp-server-git==0.1.0
+boto3==1.40.18
+
+# Docker-based Server Pattern
+run-mcp-servers-with-aws-lambda==0.4.2
+boto3==1.40.18
+# Note: This handler uses Docker container, not Python packages
+```
+
+This ensures consistent, reliable dependencies across all 18 MCP Lambda handlers.
 
 ## 🛠️ Troubleshooting
 

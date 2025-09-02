@@ -15,8 +15,8 @@ def lambda_handler(event, context):
 
     # Server configuration with proper StdioServerParameters
     server_params = StdioServerParameters(
-        command="uvx",
-        args=["awslabs.prometheus-mcp-server@latest", "--region", "us-east-1"],
+        command="python",
+        args=["-m", "awslabs.prometheus_mcp_server.server"],
         env={
             "FASTMCP_LOG_LEVEL": "DEBUG",
             "AWS_DEFAULT_REGION": "us-east-1",

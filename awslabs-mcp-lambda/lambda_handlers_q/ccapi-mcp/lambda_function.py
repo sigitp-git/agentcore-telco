@@ -15,8 +15,8 @@ def lambda_handler(event, context):
 
     # Server configuration with proper StdioServerParameters
     server_params = StdioServerParameters(
-        command="uvx",
-        args=["awslabs.ccapi-mcp-server@latest"],
+        command="python",
+        args=["-m", "awslabs.ccapi_mcp_server.server"],
         env={
             "DEFAULT_TAGS": "enabled",
             "SECURITY_SCANNING": "enabled",

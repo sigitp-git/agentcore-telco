@@ -15,8 +15,8 @@ def lambda_handler(event, context):
 
     # Server configuration with proper StdioServerParameters
     server_params = StdioServerParameters(
-        command="uvx",
-        args=["mcp-proxy", "--transport", "streamablehttp", "https://knowledge-mcp.global.api.aws"],
+        command="python",
+        args=["-m", "mcp_proxy", "--transport", "streamablehttp", "https://knowledge-mcp.global.api.aws"],
         env={
             "FASTMCP_LOG_LEVEL": "ERROR",
             "AWS_DEFAULT_REGION": "us-east-1",

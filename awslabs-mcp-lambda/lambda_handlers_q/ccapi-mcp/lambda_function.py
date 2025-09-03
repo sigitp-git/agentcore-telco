@@ -51,7 +51,12 @@ def lambda_handler(event, context):
                 "AWS_DEFAULT_REGION": os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
                 "AWS_ACCESS_KEY_ID": credentials.access_key,
                 "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
-                "AWS_SESSION_TOKEN": credentials.token
+                "AWS_SESSION_TOKEN": credentials.token,
+                # Fix: Set cache directory to writable /tmp location
+                "SCHEMA_CACHE_DIR": "/tmp/.schemas",
+                "CCAPI_CACHE_DIR": "/tmp/.schemas",
+                "CACHE_DIR": "/tmp",
+                "TMPDIR": "/tmp"
             }
         )
 
@@ -76,7 +81,13 @@ def lambda_handler(event, context):
         # Create Bedrock AgentCore Gateway handler
         gateway_handler = BedrockAgentCoreGatewayTargetHandler(request_handler)
 
-        return gateway_handler.handle(event, context)
+        result = gateway_handler.handle(event, context)
+        
+        # Debug logging for response format investigation
+        print(f"DEBUG: Lambda response type: {type(result)}")
+        print(f"DEBUG: Lambda response content: {result}")
+        
+        return result
         
     except Exception as e:
         print(f"Error in ccapi-mcp Lambda handler: {str(e)}")

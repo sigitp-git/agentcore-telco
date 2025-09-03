@@ -1,0 +1,287 @@
+[
+    {
+      "description": "Check if AWS credentials are properly configured",
+      "inputSchema": {
+        "type": "object"
+      },
+      "name": "check_environment_variables"
+    },
+    {
+      "description": "Get detailed AWS session information",
+      "inputSchema": {
+        "properties": {
+          "environment_token": {
+            "description": "Environment token from check_environment_variables()",
+            "type": "string"
+          }
+        },
+        "required": [
+          "environment_token"
+        ],
+        "type": "object"
+      },
+      "name": "get_aws_session_info"
+    },
+    {
+      "description": "Get AWS account information (convenience tool)",
+      "inputSchema": {
+        "type": "object"
+      },
+      "name": "get_aws_account_info"
+    },
+    {
+      "description": "Generate infrastructure code and CloudFormation template",
+      "inputSchema": {
+        "properties": {
+          "credentials_token": {
+            "description": "Credentials token from get_aws_session_info()",
+            "type": "string"
+          },
+          "properties": {
+            "description": "Resource properties",
+            "type": "object"
+          },
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type (e.g., AWS::S3::Bucket)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "credentials_token"
+        ],
+        "type": "object"
+      },
+      "name": "generate_infrastructure_code"
+    },
+    {
+      "description": "Explain data in human-readable format",
+      "inputSchema": {
+        "properties": {
+          "content": {
+            "description": "Any data to explain",
+            "type": "object"
+          },
+          "context": {
+            "description": "Context about the data",
+            "type": "string"
+          },
+          "generated_code_token": {
+            "description": "Generated code token from generate_infrastructure_code()",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "explain"
+    },
+    {
+      "description": "Run Checkov security scanner on CloudFormation template",
+      "inputSchema": {
+        "properties": {
+          "explained_token": {
+            "description": "Explained token from explain()",
+            "type": "string"
+          }
+        },
+        "required": [
+          "explained_token"
+        ],
+        "type": "object"
+      },
+      "name": "run_checkov"
+    },
+    {
+      "description": "Create AWS resource using Cloud Control API",
+      "inputSchema": {
+        "properties": {
+          "properties": {
+            "description": "Resource properties",
+            "type": "object"
+          },
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "properties"
+        ],
+        "type": "object"
+      },
+      "name": "create_resource"
+    },
+    {
+      "description": "Get details of AWS resource",
+      "inputSchema": {
+        "properties": {
+          "identifier": {
+            "description": "Resource identifier",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "identifier"
+        ],
+        "type": "object"
+      },
+      "name": "get_resource"
+    },
+    {
+      "description": "Update AWS resource using Cloud Control API",
+      "inputSchema": {
+        "properties": {
+          "identifier": {
+            "description": "Resource identifier",
+            "type": "string"
+          },
+          "patch_document": {
+            "description": "RFC 6902 JSON Patch operations",
+            "type": "array"
+          },
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "identifier"
+        ],
+        "type": "object"
+      },
+      "name": "update_resource"
+    },
+    {
+      "description": "Delete AWS resource using Cloud Control API",
+      "inputSchema": {
+        "properties": {
+          "identifier": {
+            "description": "Resource identifier",
+            "type": "string"
+          },
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type",
+          "identifier"
+        ],
+        "type": "object"
+      },
+      "name": "delete_resource"
+    },
+    {
+      "description": "List AWS resources of specified type",
+      "inputSchema": {
+        "properties": {
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type"
+        ],
+        "type": "object"
+      },
+      "name": "list_resources"
+    },
+    {
+      "description": "Get schema information for AWS resource type",
+      "inputSchema": {
+        "properties": {
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "AWS resource type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_type"
+        ],
+        "type": "object"
+      },
+      "name": "get_resource_schema_information"
+    },
+    {
+      "description": "Get status of resource operation request",
+      "inputSchema": {
+        "properties": {
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "request_token": {
+            "description": "Request token from create/update/delete operation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_token"
+        ],
+        "type": "object"
+      },
+      "name": "get_resource_request_status"
+    },
+    {
+      "description": "Create CloudFormation template from existing resources",
+      "inputSchema": {
+        "properties": {
+          "region": {
+            "description": "AWS region",
+            "type": "string"
+          },
+          "resources": {
+            "description": "List of resources to include",
+            "type": "array"
+          },
+          "template_id": {
+            "description": "ID of existing template generation process",
+            "type": "string"
+          },
+          "template_name": {
+            "description": "Name for the generated template",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "create_template"
+    }
+  ]

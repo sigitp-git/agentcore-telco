@@ -321,7 +321,7 @@ class AgentConfig:
     MCP_CONFIG_PATH = ''
     
     # AWS MCP Configuration
-    ENABLE_AWS_MCP = True  # Toggle to enable/disable comprehensive AWS MCP integration
+    ENABLE_AWS_MCP = False  # Toggle to enable/disable comprehensive AWS MCP integration
     AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'  # Path to AWS MCP config file
     
     # Available Models

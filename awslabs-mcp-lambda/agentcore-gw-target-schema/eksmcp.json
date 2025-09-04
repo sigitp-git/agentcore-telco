@@ -1,0 +1,468 @@
+[
+    {
+      "description": "Manages EKS CloudFormation stacks with operations for generating templates, deploying, describing, and deleting EKS clusters",
+      "inputSchema": {
+        "properties": {
+          "operation": {
+            "description": "Operation to perform",
+            "enum": ["generate", "deploy", "describe", "delete"],
+            "type": "string"
+          },
+          "template_file": {
+            "description": "Template file path (for generate/deploy operations)",
+            "type": "string"
+          },
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          }
+        },
+        "required": ["operation", "cluster_name"],
+        "type": "object"
+      },
+      "name": "manage_eks_stacks"
+    },
+    {
+      "description": "Manages individual Kubernetes resources with various operations",
+      "inputSchema": {
+        "properties": {
+          "operation": {
+            "description": "Kubernetes operation to perform",
+            "enum": ["create", "replace", "patch", "delete", "read"],
+            "type": "string"
+          },
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kubernetes resource kind",
+            "type": "string"
+          },
+          "api_version": {
+            "description": "Kubernetes API version",
+            "type": "string"
+          },
+          "name": {
+            "description": "Resource name",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "Kubernetes namespace (optional)",
+            "type": "string"
+          },
+          "body": {
+            "description": "Resource body (for create/replace/patch operations)",
+            "type": "object"
+          }
+        },
+        "required": ["operation", "cluster_name", "kind", "api_version", "name"],
+        "type": "object"
+      },
+      "name": "manage_k8s_resource"
+    },
+    {
+      "description": "Applies Kubernetes YAML manifests to an EKS cluster",
+      "inputSchema": {
+        "properties": {
+          "yaml_path": {
+            "description": "Path to YAML manifest file",
+            "type": "string"
+          },
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "Kubernetes namespace",
+            "type": "string"
+          },
+          "force": {
+            "description": "Force update existing resources",
+            "type": "boolean"
+          }
+        },
+        "required": ["yaml_path", "cluster_name", "namespace"],
+        "type": "object"
+      },
+      "name": "apply_yaml"
+    },
+    {
+      "description": "Lists Kubernetes resources of a specific kind in an EKS cluster",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kubernetes resource kind",
+            "type": "string"
+          },
+          "api_version": {
+            "description": "Kubernetes API version",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "Kubernetes namespace (optional)",
+            "type": "string"
+          },
+          "label_selector": {
+            "description": "Label selector for filtering (optional)",
+            "type": "string"
+          },
+          "field_selector": {
+            "description": "Field selector for filtering (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["cluster_name", "kind", "api_version"],
+        "type": "object"
+      },
+      "name": "list_k8s_resources"
+    },
+    {
+      "description": "Lists all available API versions in the specified Kubernetes cluster",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          }
+        },
+        "required": ["cluster_name"],
+        "type": "object"
+      },
+      "name": "list_api_versions"
+    },
+    {
+      "description": "Generates Kubernetes manifests for application deployment",
+      "inputSchema": {
+        "properties": {
+          "app_name": {
+            "description": "Application name",
+            "type": "string"
+          },
+          "image_uri": {
+            "description": "Container image URI",
+            "type": "string"
+          },
+          "output_dir": {
+            "description": "Output directory for manifests",
+            "type": "string"
+          },
+          "port": {
+            "description": "Application port (optional)",
+            "type": "integer"
+          },
+          "replicas": {
+            "description": "Number of replicas (optional)",
+            "type": "integer"
+          },
+          "cpu": {
+            "description": "CPU resource request (optional)",
+            "type": "string"
+          },
+          "memory": {
+            "description": "Memory resource request (optional)",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "Kubernetes namespace (optional)",
+            "type": "string"
+          },
+          "load_balancer_scheme": {
+            "description": "Load balancer scheme (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["app_name", "image_uri", "output_dir"],
+        "type": "object"
+      },
+      "name": "generate_app_manifest"
+    },
+    {
+      "description": "Retrieves logs from pods in a Kubernetes cluster",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "pod_name": {
+            "description": "Pod name",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "Kubernetes namespace",
+            "type": "string"
+          },
+          "container_name": {
+            "description": "Container name (optional)",
+            "type": "string"
+          },
+          "since_seconds": {
+            "description": "Logs since seconds ago (optional)",
+            "type": "integer"
+          },
+          "tail_lines": {
+            "description": "Number of lines to tail (optional)",
+            "type": "integer"
+          },
+          "limit_bytes": {
+            "description": "Limit bytes returned (optional)",
+            "type": "integer"
+          },
+          "previous": {
+            "description": "Get logs from previous container (optional)",
+            "type": "boolean"
+          }
+        },
+        "required": ["cluster_name", "pod_name", "namespace"],
+        "type": "object"
+      },
+      "name": "get_pod_logs"
+    },
+    {
+      "description": "Retrieves events related to specific Kubernetes resources",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kubernetes resource kind",
+            "type": "string"
+          },
+          "name": {
+            "description": "Resource name",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "Kubernetes namespace (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["cluster_name", "kind", "name"],
+        "type": "object"
+      },
+      "name": "get_k8s_events"
+    },
+    {
+      "description": "Retrieves comprehensive VPC configuration details for EKS clusters",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "vpc_id": {
+            "description": "VPC ID (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["cluster_name"],
+        "type": "object"
+      },
+      "name": "get_eks_vpc_config"
+    },
+    {
+      "description": "Retrieves logs from CloudWatch for a specific resource within an EKS cluster",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "log_type": {
+            "description": "Type of logs to retrieve",
+            "enum": ["application", "host", "performance", "control-plane", "custom"],
+            "type": "string"
+          },
+          "resource_type": {
+            "description": "Resource type",
+            "enum": ["pod", "node", "container", "cluster"],
+            "type": "string"
+          },
+          "resource_name": {
+            "description": "Resource name (optional)",
+            "type": "string"
+          },
+          "minutes": {
+            "description": "Time range in minutes (optional)",
+            "type": "integer"
+          },
+          "start_time": {
+            "description": "Start time (optional)",
+            "type": "string"
+          },
+          "end_time": {
+            "description": "End time (optional)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Limit number of entries (optional)",
+            "type": "integer"
+          },
+          "filter_pattern": {
+            "description": "Log filter pattern (optional)",
+            "type": "string"
+          },
+          "fields": {
+            "description": "Custom fields to include (optional)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["cluster_name", "log_type", "resource_type"],
+        "type": "object"
+      },
+      "name": "get_cloudwatch_logs"
+    },
+    {
+      "description": "Retrieves metrics from CloudWatch for Kubernetes resources",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "metric_name": {
+            "description": "CloudWatch metric name",
+            "type": "string"
+          },
+          "namespace": {
+            "description": "CloudWatch namespace",
+            "type": "string"
+          },
+          "dimensions": {
+            "description": "CloudWatch dimensions",
+            "type": "object"
+          },
+          "minutes": {
+            "description": "Time range in minutes (optional)",
+            "type": "integer"
+          },
+          "start_time": {
+            "description": "Start time (optional)",
+            "type": "string"
+          },
+          "end_time": {
+            "description": "End time (optional)",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Limit data points (optional)",
+            "type": "integer"
+          },
+          "stat": {
+            "description": "Statistic type (optional)",
+            "type": "string"
+          },
+          "period": {
+            "description": "Period in seconds (optional)",
+            "type": "integer"
+          }
+        },
+        "required": ["cluster_name", "metric_name", "namespace", "dimensions"],
+        "type": "object"
+      },
+      "name": "get_cloudwatch_metrics"
+    },
+    {
+      "description": "Provides guidance on available CloudWatch metrics for different resource types in EKS clusters",
+      "inputSchema": {
+        "properties": {
+          "resource_type": {
+            "description": "Resource type for metrics guidance",
+            "enum": ["cluster", "node", "pod", "namespace", "service"],
+            "type": "string"
+          }
+        },
+        "required": ["resource_type"],
+        "type": "object"
+      },
+      "name": "get_eks_metrics_guidance"
+    },
+    {
+      "description": "Retrieves all policies attached to a specified IAM role",
+      "inputSchema": {
+        "properties": {
+          "role_name": {
+            "description": "IAM role name",
+            "type": "string"
+          }
+        },
+        "required": ["role_name"],
+        "type": "object"
+      },
+      "name": "get_policies_for_role"
+    },
+    {
+      "description": "Adds a new inline policy with specified permissions to an IAM role",
+      "inputSchema": {
+        "properties": {
+          "policy_name": {
+            "description": "Policy name",
+            "type": "string"
+          },
+          "role_name": {
+            "description": "IAM role name",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Policy permissions (JSON object)",
+            "type": "object"
+          }
+        },
+        "required": ["policy_name", "role_name", "permissions"],
+        "type": "object"
+      },
+      "name": "add_inline_policy"
+    },
+    {
+      "description": "Searches the EKS Troubleshoot Guide for troubleshooting information",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "description": "Search query for troubleshooting",
+            "type": "string"
+          }
+        },
+        "required": ["query"],
+        "type": "object"
+      },
+      "name": "search_eks_troubleshoot_guide"
+    },
+    {
+      "description": "Retrieves Amazon EKS Insights that identify potential issues with your EKS cluster configuration",
+      "inputSchema": {
+        "properties": {
+          "cluster_name": {
+            "description": "EKS cluster name",
+            "type": "string"
+          },
+          "insight_id": {
+            "description": "Specific insight ID (optional)",
+            "type": "string"
+          },
+          "category": {
+            "description": "Insight category filter (optional)",
+            "enum": ["MISCONFIGURATION", "UPGRADE_READINESS"],
+            "type": "string"
+          },
+          "next_token": {
+            "description": "Pagination token (optional)",
+            "type": "string"
+          }
+        },
+        "required": ["cluster_name"],
+        "type": "object"
+      },
+      "name": "get_eks_insights"
+    }
+  ]
+  

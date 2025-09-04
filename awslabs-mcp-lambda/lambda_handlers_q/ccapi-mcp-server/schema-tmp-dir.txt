@@ -1,0 +1,208 @@
+# AWS Cloud Control API MCP Server Lambda Function
+
+This Lambda function provides AWS Cloud Control API resource management capabilities through the Model Context Protocol (MCP) for Bedrock AgentCore Gateway integration. The MCP `stdio` version of this MCP server is available here: https://github.com/awslabs/mcp/tree/main/src/ccapi-mcp-server
+
+## Deployment
+
+This server uses AWS CDK for deployment, following the same pattern as other MCP Lambda servers in this repository. 
+
+## Overview
+
+The `lambda_function.py` implements a serverless handler that bridges AWS Cloud Control API operations with MCP-compatible clients through the Bedrock AgentCore Gateway.
+
+## Features
+
+- **AWS Resource Management**: CRUD operations on AWS resources via Cloud Control API
+- **Default Tagging**: Automatic application of identification tags to all created resources
+- **Bedrock AgentCore Gateway Integration**: Native compatibility with Amazon Bedrock AgentCore Gateway
+- **Lambda Optimized**: Configured for AWS Lambda execution environment with proper caching
+
+## Architecture
+
+```
+Client Request → Bedrock AgentCore Gateway → Lambda Function → Cloud Control API → AWS Resources
+```
+
+## Configuration
+
+### Environment Variables
+
+The Lambda function automatically configures the following environment variables, modify based on your needs:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DEFAULT_TAGS` | Enable automatic resource tagging | `enabled` |
+| `SECURITY_SCANNING` | Enable Checkov security scanning | `enabled` |
+| `AWS_DEFAULT_REGION` | AWS region for operations | `us-east-1` |
+| `SCHEMA_CACHE_DIR` | Cache directory for schemas | `/tmp/.schemas` |
+| `FASTMCP_LOG_LEVEL` | Logging level | `ERROR` |
+
+### AWS Credentials
+
+The function uses the Lambda execution role's credentials automatically through `boto3.Session()`. No manual credential configuration is required.
+
+## Key Components
+
+### MockClientContext Class
+```python
+class MockClientContext:
+    def __init__(self, tool_name):
+        self.custom = {"bedrockAgentCoreToolName": tool_name}
+```
+Provides fallback tool name extraction when not available in the Lambda context.
+
+### Main Handler Function
+The `lambda_handler` function:
+1. Extracts AWS credentials from the Lambda execution role
+2. Configures the MCP server with proper parameters
+3. Sets up Bedrock AgentCore Gateway integration
+4. Handles tool name extraction from event or context
+5. Returns structured responses for the AgentCore Gateway
+
+## Usage
+
+### CDK Deployment
+
+1. **Install Dependencies**: Install CDK and Python dependencies:
+
+```bash
+# Install CDK dependencies
+pip install -r requirements.txt
+
+# Ensure CDK is bootstrapped in your account
+cdk bootstrap
+```
+
+2. **Deploy the Stack**: Deploy using CDK:
+
+```bash
+# Set your AWS account and region
+export CDK_DEFAULT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+export CDK_DEFAULT_REGION=us-east-1  # or your preferred region
+```
+
+To build, use:
+```bash
+python3 cdk_stack.py #--upgrade to force replacement
+```
+
+# Deploy the stack
+```bash
+cdk deploy --app "python3 cdk_stack.py"
+```
+
+3. **Optional Integration Testing**: For integration testing with a specific test ID:
+
+```bash
+export INTEG_TEST_ID=my-test-123
+cdk deploy --app "python3 cdk_stack.py"
+```
+
+### Deployment Requirements
+- **Runtime**: Python 3.12
+- **Handler**: `index.handler`
+- **Execution Role**: Automatically created with Cloud Control API permissions
+- **Memory**: 1024MB
+- **Timeout**: 5 minutes for complex operations
+
+### Required IAM Permissions
+The Lambda execution role requires specific access depending on your needs, for example to describe EC2 isntances:
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetRole",
+                "iam:PassRole",
+                "ec2:Describe*"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+### Integration with Bedrock AgentCore Gateway
+Configure the Lambda function as a target in your Bedrock AgentCore Gateway setup to enable AI agents to manage AWS resources through natural language interactions. The following code on index.py strip the AgentCore Gateway Target name, where "ccapimcpcdk" is the target name in below example.
+
+```python
+# Strip the ccapimcpcdk___ prefix if present, where "ccapimcpcdk" is the name of your Bedrock AgentCore Gateway
+        if tool_name and tool_name.startswith("ccapimcpcdk___"):
+            tool_name = tool_name.replace("ccapimcpcdk___", "")
+```
+
+## Error Handling
+
+The function includes comprehensive error handling:
+- Credential validation
+- Tool name extraction fallbacks
+- Detailed error logging
+- Graceful failure responses
+
+## Dependencies
+
+- `boto3`: AWS SDK for Python
+- `mcp_lambda`: [Run MCP servers with AWS Lambda] (https://github.com/awslabs/run-model-context-protocol-servers-with-aws-lambda)
+- `awslabs.ccapi_mcp_server`: Cloud Control API MCP server implementation
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Permission Errors**: Ensure the Lambda execution role has sufficient permissions
+2. **Timeout Issues**: Increase Lambda timeout for complex resource operations
+3. **Memory Issues**: Increase memory allocation if processing large resource definitions
+4. **Tool Name Missing**: Function automatically extracts tool names from multiple event sources
+5. **Cache Isolation**: Ensure Lambda function's temporary file operations in `/tmp` directory. Update the MCP server code to use `/tmp/.schemas` instead of the hardcoded `/var/task/awslabs/ccapi_mcp_server/.schemas` path, since only `/tmp` is writable in Lambda. The hardcoded values is on `/var/task/awslabs/ccapi_mcp_server/schema_manager.py` line 41
+
+### Debug Logging
+The function includes debug output for response investigation:
+```python
+print(f"DEBUG: Lambda response type: {type(result)}")
+print(f"DEBUG: Lambda response content: {result}")
+```
+
+## Files Included
+
+- `function/index.py` - Main Lambda handler implementation
+- `function/requirements.txt` - Lambda function dependencies
+- `cdk_stack.py` - CDK stack definition for deployment
+- `requirements.txt` - CDK dependencies
+- `README.md` - This documentation
+
+## CDK Stack Features
+
+The CDK stack (`cdk_stack.py`) provides:
+
+- **Lambda Function** with optimized configuration for Cloud Control API
+- **IAM Execution Role** with example Cloud Control API permissions
+- **CloudWatch Log Group** with 1-day retention for cost optimization
+- **Function URL** with AWS IAM authorization
+- **Environment Variables** for MCP server configuration
+- **Comprehensive Outputs** for integration
+
+### Stack Configuration
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Function Name | `mcp-server-ccapi` | Lambda function name |
+| Runtime | `python3.12` | `mcp_lambda` requires Python 3.11+ |
+| Memory | `1024MB` | Memory allocation |
+| Timeout | `5 minutes` | Function timeout |
+| Log Retention | `1 day` | CloudWatch log retention |
+
+### Testing 
+
+```bash
+$ echo -n '{"prompt": "list my ec2 instances"}' | base64 > /tmp/correct_payload.txt
+
+$ aws bedrock-agentcore invoke-agent-runtime --agent-runtime-arn "arn:aws:bedrock-agentcore:us-east-1:[ACCOUNT-ID]:runtime/agent-name-asdf" --content-type "application/json" --accept "application/json" --payload "$(cat /tmp/correct_payload.txt)" --region us-east-1 /tmp/final_response.json
+```
+
+## Related Documentation
+
+- [AWS Cloud Control API Documentation](https://docs.aws.amazon.com/cloudcontrolapi/)
+- [Cloud Control API MCP server](https://github.com/awslabs/mcp/tree/main/src/ccapi-mcp-server)
+- [Amazon Bedrock AgentCore Gateway](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html)

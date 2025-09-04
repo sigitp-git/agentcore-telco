@@ -321,7 +321,7 @@ class AgentConfig:
     MCP_CONFIG_PATH = ''
     
     # AWS MCP Configuration
-    ENABLE_AWS_MCP = True  # Toggle to enable/disable comprehensive AWS MCP integration
+    ENABLE_AWS_MCP = False  # Toggle to enable/disable comprehensive AWS MCP integration
     AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'  # Path to AWS MCP config file
     
     # Available Models
@@ -461,6 +461,7 @@ EXPERTISE AREAS:
 - Cost optimization for hybrid deployments
 
 TOOL USAGE:
+- Use list_resources() to list AWS resources
 - All AWS operations use MCP tools exclusively (AgentCore Gateway + AWS MCP servers)
 - Use websearch for latest AWS documentation and best practices
 - Use MCP management tools to discover available AWS service tools

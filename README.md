@@ -54,6 +54,15 @@ agentcore-telco/
 ├── vpc-agentcore/               # VPC Agent (same structure)
 ├── outposts-agentcore/          # Outposts Agent (same structure)
 ├── prometheus-agentcore/        # Prometheus Agent (same structure)
+├── a2astrands/                  # Multi-Agent Orchestration Framework
+│   ├── README.md                # A2A Strands framework overview
+│   ├── IMPLEMENTATION.md        # Implementation plan for agent auto-discovery
+│   └── docs/                    # Multi-agent orchestration documentation
+│       ├── a2astrands.md        # Agent-to-Agent protocol integration
+│       ├── agentsastools.md     # Agents as Tools pattern
+│       ├── swarm.md             # Swarm multi-agent collaboration
+│       ├── graph.md             # Graph-based workflow orchestration
+│       └── workflow.md          # Sequential and parallel task coordination
 ├── awslabs-mcp-lambda/          # MCP (Model Context Protocol) Integration
 │   └── mcp/                     # MCP configuration and documentation
 │       ├── mcp.json             # Active MCP server configuration
@@ -62,7 +71,6 @@ agentcore-telco/
 │       └── MCP_FIXES_SUMMARY.md # Summary of MCP fixes and improvements
 └── agent2agent/                 # Agent2Agent protocol integration
     ├── README.md                # A2A documentation
-
     ├── types.py                 # A2A type definitions and data models
     ├── __init__.py              # Package initialization
     ├── docs/                    # Integration guides
@@ -70,16 +78,47 @@ agentcore-telco/
     └── wrappers/                # A2A wrapper classes
 ```
 
-## 🌐 Agent2Agent (A2A) Integration
+## 🌐 Multi-Agent Orchestration Framework (A2A Strands)
 
-This project includes **Agent2Agent protocol integration**, enabling cross-agent communication and collaboration:
+This project includes a comprehensive **Multi-Agent Orchestration Framework** that enables sophisticated collaboration between the four specialized agents:
+
+### 🚀 Planned Enhancement: Agent Auto-Discovery & Cross-Tool Usage
+
+**Implementation Status**: 📋 Planning Phase - [View Implementation Plan](a2astrands/IMPLEMENTATION.md)
+
+The upcoming A2A Strands framework will transform our isolated agents into a collaborative ecosystem:
+
+#### Key Capabilities (Planned)
+- **🔍 Auto-Discovery**: Agents automatically discover peer agents and their capabilities
+- **🔧 Cross-Tool Access**: EKS agent can use VPC networking tools, Prometheus monitoring, etc.
+- **🤝 Intelligent Delegation**: Agents recognize when to delegate tasks to specialists
+- **🧠 Collaborative Problem-Solving**: Complex infrastructure issues solved by agent teams
+- **🎯 Unified User Experience**: Comprehensive solutions regardless of entry point
+
+#### Architecture Patterns
+- **Agents as Tools**: Hierarchical delegation with orchestrator and specialists
+- **Swarm Pattern**: Collaborative teams with shared context and autonomous coordination
+- **Graph Workflows**: Deterministic DAG-based task execution with dependencies
+- **A2A Protocol**: Cross-platform agent discovery and communication
+
+#### Real-World Benefits (Planned)
+- **EKS networking issues** → Automatically involves VPC agent for network analysis
+- **Performance problems** → Prometheus agent provides monitoring insights
+- **Hybrid connectivity** → Outposts agent contributes specialized expertise
+- **Complex infrastructure problems** → All agents collaborate in intelligent swarms
+
+📚 **Framework Documentation**: [A2A Strands Overview](a2astrands/README.md)
+
+### 🔗 Current Agent2Agent Integration
+
+**Implementation Status**: ✅ Active - Basic cross-agent communication available
 
 - **Enhanced Troubleshooting** - Agents collaborate for comprehensive analysis
 - **Cross-Domain Context** - EKS ↔ VPC ↔ Prometheus ↔ Outposts communication
 - **Automated Workflows** - Multi-agent problem resolution
 - **Comprehensive Insights** - Combined analysis from multiple agents
 
-### Quick A2A Example
+### Quick A2A Example (Current)
 ```bash
 # Run the A2A integration example
 python3 run_a2a_example.py
@@ -88,11 +127,40 @@ python3 run_a2a_example.py
 python3 agent2agent/examples/a2a_integration_example_full.py
 ```
 
-**Key A2A Features:**
+### Future Multi-Agent Orchestration (Planned)
+```bash
+# Auto-discovery and collaboration (planned)
+cd eks-agentcore
+python3 agent.py
+# User: "My EKS cluster has networking issues and poor performance"
+# → EKS agent automatically collaborates with VPC and Prometheus agents
+
+# Swarm collaboration for complex problems (planned)
+python3 -c "
+from a2astrands import create_infrastructure_swarm
+swarm = create_infrastructure_swarm()
+result = swarm('Diagnose hybrid cloud connectivity issues')
+"
+
+# Graph workflow for structured analysis (planned)
+python3 -c "
+from a2astrands import create_infrastructure_diagnostic_workflow
+workflow = create_infrastructure_diagnostic_workflow()
+result = workflow('Complete infrastructure health check')
+"
+```
+
+**Current A2A Features:**
 - **Agent Type System** - Complete type definitions for A2A protocol
 - **Cross-Agent Messaging** - Structured communication between agents
 - **Agent Cards** - Standardized capability discovery and registration
 - **Enhanced Troubleshooting** - Multi-domain collaborative problem solving
+
+**Planned A2A Strands Features:**
+- **Auto-Discovery Service** - Centralized agent registration and capability mapping
+- **Intelligent Agent Selection** - Automatic routing based on query analysis
+- **Cross-Agent Tool Integration** - Seamless tool sharing between specialists
+- **Multi-Agent Workflows** - Swarm and Graph patterns for complex problems
 
 #### A2A Usage in Your Code
 
@@ -133,7 +201,10 @@ metrics = await a2a_wrapper.send_request_to_agent("Prometheus-Agent", {
 })
 ```
 
-See [agent2agent/README.md](agent2agent/README.md) for complete A2A documentation.
+📚 **Documentation:**
+- **Current A2A**: [agent2agent/README.md](agent2agent/README.md) - Basic cross-agent communication
+- **Future Framework**: [a2astrands/README.md](a2astrands/README.md) - Multi-agent orchestration overview
+- **Implementation Plan**: [a2astrands/IMPLEMENTATION.md](a2astrands/IMPLEMENTATION.md) - Detailed technical roadmap
 
 ## 🚀 Quick Start
 
@@ -388,10 +459,17 @@ Each telco container is paired with an intelligent sidecar that:
 - Provides correlation between telco functions and AWS services
 - Enables automated remediation and optimization
 
-#### Communication Flow
+#### Communication Flow (Current + Planned)
 1. **Telco Container ↔ Agentic Sidecar**: 1:1 pairing for health monitoring
 2. **Agentic Sidecar ↔ AWS Agents**: Many-to-many for infrastructure management
 3. **AWS Agent ↔ AgentCore Gateway**: 1:1 dedicated connection for tool execution
+4. **🚀 Planned: AWS Agent ↔ A2A Strands Framework**: Multi-agent collaboration for complex telco issues
+
+#### Enhanced Telco Scenarios (Planned with A2A Strands)
+- **UPF Performance Issues**: EKS agent detects pod problems → Prometheus provides metrics → VPC analyzes network bottlenecks
+- **AMF Connectivity Problems**: VPC agent diagnoses network issues → Outposts checks hybrid connectivity → EKS validates cluster health
+- **Cross-Function Dependencies**: Intelligent swarms analyze complex interactions between multiple 5G functions
+- **Automated Remediation**: Graph workflows orchestrate systematic problem resolution across infrastructure layers
 
 ## 🛠️ Usage
 
@@ -583,7 +661,24 @@ streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 
 All four agents (VPC, Outposts, EKS, Prometheus) have been successfully refactored to use identical MCP-only architecture, providing consistent, scalable, and maintainable AWS operations across the entire telco agent ecosystem.
 
+**🚀 UPCOMING MILESTONE: Multi-Agent Orchestration Framework (Q1 2026)**
+
+The A2A Strands framework will enable intelligent auto-discovery and cross-agent collaboration, transforming isolated agents into a collaborative ecosystem. [View Implementation Plan](a2astrands/IMPLEMENTATION.md)
+
 ### Latest (September 2025)
+
+#### 🚀 A2A Strands Framework Planning ✅
+- **Multi-Agent Orchestration Framework**: Comprehensive planning completed for agent auto-discovery and collaboration
+  - ✅ **Implementation Plan Created**: [Detailed 6-week roadmap](a2astrands/IMPLEMENTATION.md) for transforming isolated agents into collaborative ecosystem
+  - ✅ **Architecture Patterns Defined**: Agents as Tools, Swarm, Graph, and Workflow patterns for different use cases
+  - ✅ **Framework Documentation**: Complete [A2A Strands overview](a2astrands/README.md) with usage examples and best practices
+  - ✅ **Technical Specifications**: Auto-discovery service, cross-agent tool integration, and intelligent delegation patterns
+  - ✅ **Deployment Architecture**: Container orchestration, service discovery, and testing strategies
+- **Planned Benefits**: 
+  - **Intelligent Problem-Solving**: EKS networking issues automatically involve VPC and Prometheus agents
+  - **Unified User Experience**: Comprehensive solutions regardless of which agent users start with
+  - **Collaborative Workflows**: Complex infrastructure problems solved by specialized agent teams
+  - **Auto-Discovery**: Agents automatically find and utilize peer agent capabilities
 
 #### 🏗️ MCP-Only Architecture Completion ✅
 - **Complete Architecture Refactoring**: All four agents (VPC, Outposts, EKS, Prometheus) now use identical MCP-only architecture

@@ -14,6 +14,15 @@ agentcore-telco/
 │   ├── AGENT_IMPROVEMENTS.md    # Consolidated agent improvements and technical details
 │   ├── DOCUMENTATION_CONSOLIDATION_SUMMARY.md # Documentation consolidation summary
 │   └── telco-architecture-pattern.md # Telco architecture patterns
+├── a2astrands/                  # 🚀 Multi-Agent Orchestration Framework
+│   ├── README.md                # A2A Strands framework overview
+│   ├── IMPLEMENTATION.md        # Implementation plan for agent auto-discovery
+│   └── docs/                    # Multi-agent orchestration documentation
+│       ├── a2astrands.md        # Agent-to-Agent protocol integration
+│       ├── agentsastools.md     # Agents as Tools pattern
+│       ├── swarm.md             # Swarm multi-agent collaboration
+│       ├── graph.md             # Graph-based workflow orchestration
+│       └── workflow.md          # Sequential and parallel task coordination
 ├── eks-agentcore/               # EKS Agent
 ├── vpc-agentcore/               # VPC Agent  
 ├── outposts-agentcore/          # Outposts Agent
@@ -255,6 +264,16 @@ except Exception as e:
 - **docs/AGENT_IMPROVEMENTS.md**: Technical details and improvements for all agents
 - **docs/DOCUMENTATION_CONSOLIDATION_SUMMARY.md**: Documentation consolidation summary
 - **docs/telco-architecture-pattern.md**: Telco architecture patterns
+
+### Multi-Agent Orchestration Documentation (a2astrands/) 🚀
+- **a2astrands/README.md**: Multi-agent orchestration framework overview
+- **a2astrands/IMPLEMENTATION.md**: Detailed implementation plan for agent auto-discovery
+- **a2astrands/docs/**: Complete documentation for all orchestration patterns
+  - **a2astrands.md**: Agent-to-Agent protocol integration guide
+  - **agentsastools.md**: Agents as Tools hierarchical delegation pattern
+  - **swarm.md**: Swarm collaborative multi-agent teams
+  - **graph.md**: Graph-based deterministic workflow orchestration
+  - **workflow.md**: Sequential and parallel task coordination
 
 ### Specialized Documentation (Preserved)
 - **MCP Integration Docs**: awslabs-mcp-lambda/mcp/ directory

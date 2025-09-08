@@ -19,6 +19,7 @@
 - **strands-agents-tools** - Agent tooling extensions
 - **bedrock-agentcore** - AgentCore SDK
 - **bedrock-agentcore-starter-toolkit** - Development utilities
+- **🚀 strands-agents[a2a]** - Multi-agent orchestration with A2A protocol support (planned)
 
 ### Additional Libraries
 - **ddgs** - DuckDuckGo search integration
@@ -202,6 +203,15 @@ AgentConfig.set_model('claude-3-5-sonnet-v2')
 - ✅ **Authentication**: AWS Cognito integration
 - ✅ **Error Handling**: Enhanced error recovery and user messaging
 - ✅ **Agent2Agent**: Cross-agent communication protocol
+- ✅ **A2A Strands Framework Planning**: Complete implementation roadmap for multi-agent orchestration
+
+### Planned Components (Q1 2026) 🚀
+- 🚀 **A2A Protocol Integration**: Agent-to-Agent protocol for cross-platform communication
+- 🚀 **Multi-Agent Orchestration**: Swarm, Graph, and Workflow patterns for collaborative problem-solving
+- 🚀 **Auto-Discovery Service**: Centralized agent registration and capability mapping
+- 🚀 **Cross-Agent Tool Integration**: Seamless tool sharing between specialized agents
+- 🚀 **Intelligent Agent Selection**: Automatic routing based on query analysis and agent capabilities
+- 🚀 **Collaborative Workflows**: Complex infrastructure problems solved by agent teams
 
 ## MCP-Only Architecture (September 2025)
 
@@ -228,6 +238,66 @@ All four agents (VPC, Outposts, EKS, Prometheus) now have:
 - ✅ **Specialized system prompts for their respective domains**
 - ✅ **Enhanced error handling with user-friendly messages**
 
+## A2A Strands Multi-Agent Orchestration Framework (Planned Q1 2026) 🚀
+
+### Framework Architecture
+The A2A Strands framework will enable intelligent collaboration between the four specialized agents:
+
+#### Core Components
+- **Auto-Discovery Service**: Centralized agent registration and capability mapping
+- **A2A Protocol Integration**: Cross-platform agent communication using Agent-to-Agent protocol
+- **Intelligent Agent Selection**: Automatic routing based on query analysis and agent capabilities
+- **Cross-Agent Tool Integration**: Seamless tool sharing between specialized agents
+
+#### Orchestration Patterns
+```python
+# Agents as Tools Pattern - Hierarchical delegation
+@tool
+def eks_cluster_analysis(cluster_name: str, issue_description: str) -> str:
+    """Analyze EKS cluster issues using the specialized EKS agent."""
+    # Implementation calls EKS agent via A2A protocol
+
+# Swarm Pattern - Collaborative problem-solving
+from strands.multiagent import Swarm
+swarm = Swarm([eks_agent_proxy, vpc_agent_proxy, prometheus_agent_proxy])
+result = swarm("Diagnose complex infrastructure issue")
+
+# Graph Pattern - Deterministic workflows
+from strands.multiagent import GraphBuilder
+builder = GraphBuilder()
+builder.add_node(prometheus_agent_proxy, "monitoring_check")
+builder.add_node(vpc_agent_proxy, "network_analysis")
+builder.add_edge("monitoring_check", "network_analysis")
+```
+
+#### Implementation Phases (6 weeks)
+1. **Phase 1**: A2A Protocol Integration - Each agent exposes itself as an A2A server
+2. **Phase 2**: Agent Discovery and Registration - Centralized discovery service
+3. **Phase 3**: Cross-Agent Tool Integration - Agents can invoke each other's tools
+4. **Phase 4**: Collaborative Workflows - Swarm and Graph patterns
+5. **Phase 5**: Enhanced System Prompts - Agents become collaboration-aware
+
+#### Deployment Architecture
+```yaml
+# Container orchestration for multi-agent deployment
+services:
+  eks-agent:
+    ports: ["9001:9001"]
+    environment: [AGENT_TYPE=eks, A2A_PORT=9001]
+  vpc-agent:
+    ports: ["9002:9002"] 
+    environment: [AGENT_TYPE=vpc, A2A_PORT=9002]
+  # ... other agents
+  discovery-service:
+    ports: ["9000:9000"]
+```
+
+### Technical Benefits
+- **Intelligent Problem-Solving**: EKS networking issues automatically involve VPC and Prometheus agents
+- **Unified User Experience**: Comprehensive solutions regardless of which agent users start with
+- **Collaborative Workflows**: Complex infrastructure problems solved by specialized agent teams
+- **Auto-Discovery**: Agents automatically find and utilize peer agent capabilities
+
 ## Error Handling & Reliability
 
 ### MCP Tools Integration
@@ -242,9 +312,20 @@ All four agents (VPC, Outposts, EKS, Prometheus) now have:
 - **Automatic Cleanup** - Proper resource cleanup on agent shutdown
 - **Error Recovery** - Graceful handling of memory service unavailability
 
+### Multi-Agent Error Handling (Planned) 🚀
+- **Cross-Agent Timeout Management** - Prevent runaway multi-agent processes
+- **Agent Failure Recovery** - Graceful degradation when peer agents are unavailable
+- **Circular Dependency Prevention** - Avoid infinite agent delegation loops
+- **Resource Exhaustion Protection** - Rate limiting and timeout controls for agent interactions
+
 ### Best Practices
 - Always use try-catch blocks for external service calls
 - Provide informative error messages to users
 - Implement timeout mechanisms for long-running operations
 - Use structured logging for debugging and monitoring
 - All AWS operations must use MCP tools exclusively
+- **🚀 Multi-Agent Coordination**: Design agents for collaboration and delegation when implementing A2A Strands
+- **🚀 Capability-Based Routing**: Use agent capabilities for intelligent task delegation
+- **🚀 Shared Context Management**: Maintain context across multi-agent workflows
+- **🚀 Agent Discovery Patterns**: Implement robust discovery and registration mechanisms
+- **🚀 Cross-Agent Security**: Secure A2A communication and authentication between agents

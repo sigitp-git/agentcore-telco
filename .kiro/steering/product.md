@@ -24,6 +24,7 @@ A comprehensive collection of specialized AWS agents built on Amazon Bedrock Age
 - **Web Search** - DuckDuckGo integration for real-time information retrieval
 - **Enhanced Error Handling** - Robust error recovery and user-friendly messaging
 - **Cross-Agent Communication** - Agent2Agent protocol for collaborative problem solving
+- **🚀 Multi-Agent Orchestration Framework (A2A Strands)** - Planned intelligent auto-discovery and cross-agent collaboration system
 
 ### Runtime Architecture
 
@@ -73,3 +74,18 @@ Telecommunications and cloud infrastructure teams managing AWS services, particu
 - ✅ **Streamlit Interfaces**: Interactive web interfaces for all agents
 - ✅ **Enhanced Error Handling**: Robust error recovery and user-friendly messaging
 - ✅ **Documentation**: Comprehensive documentation and steering guides updated
+- ✅ **A2A Strands Framework Planning**: Complete implementation plan for multi-agent orchestration
+
+### Upcoming Milestones (Q1 2026) 🚀
+- 🚀 **Multi-Agent Auto-Discovery**: Agents automatically discover peer agents and capabilities
+- 🚀 **Cross-Tool Integration**: EKS agent can use VPC networking tools, Prometheus monitoring, etc.
+- 🚀 **Intelligent Delegation**: Agents recognize when to delegate tasks to specialists
+- 🚀 **Collaborative Problem-Solving**: Complex infrastructure issues solved by agent teams
+- 🚀 **Unified User Experience**: Comprehensive solutions regardless of entry point
+
+### A2A Strands Framework Components
+- **Agents as Tools Pattern**: Hierarchical delegation with orchestrator and specialists
+- **Swarm Pattern**: Collaborative teams with shared context and autonomous coordination  
+- **Graph Workflows**: Deterministic DAG-based task execution with dependencies
+- **Workflow Management**: Sequential and parallel task coordination with explicit control
+- **A2A Protocol Integration**: Cross-platform agent discovery and communication

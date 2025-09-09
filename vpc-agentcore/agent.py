@@ -361,7 +361,7 @@ class AgentConfig:
     MCP_CONFIG_PATH = ''
     
     # AWS MCP Configuration
-    ENABLE_AWS_MCP = False  # Toggle to enable/disable comprehensive AWS MCP integration
+    ENABLE_AWS_MCP = True  # Toggle to enable/disable comprehensive AWS MCP integration
     AWS_MCP_CONFIG_PATH = '/home/ubuntu/agentcore-telco/awslabs-mcp-lambda/mcp/mcp.json'  # Path to AWS MCP config file
     
     # Available Models
@@ -569,7 +569,6 @@ def handle_command_line_args():
                 current = " (CURRENT)" if key == AgentConfig.SELECTED_MODEL else ""
                 print(f"  • {desc}{current}")
             print("\nMCP Configuration Tools:")
-            print("  • list_mcp_server_names()       # Quick list of server names")
             print("  • list_mcp_servers_from_config() # Detailed server information")
             print("  • manage_mcp_config()           # Manage MCP configuration")
             print("  • show_available_mcp_servers()  # Show servers with details")
@@ -873,43 +872,7 @@ logger = logging.getLogger(__name__)
 
 
 # Define a websearch tool
-@tool
-def list_mcp_server_names() -> str:
-    """Get a quick list of all MCP server names from the configuration file.
-    
-    Returns:
-        Simple list of MCP server names with their status
-    """
-    if not AgentConfig.ENABLE_MCP_CONFIG:
-        return "❌ MCP configuration loading is disabled."
-    
-    servers = AgentConfig.get_mcp_servers()
-    if not servers:
-        return "ℹ️  No MCP servers found in configuration file."
-    
-    enabled_servers = []
-    disabled_servers = []
-    
-    for name, config in servers.items():
-        if config.get('disabled', False):
-            disabled_servers.append(name)
-        else:
-            enabled_servers.append(name)
-    
-    result = f"📋 **MCP Server Names ({len(servers)} total):**\n\n"
-    
-    if enabled_servers:
-        result += f"🟢 **Enabled ({len(enabled_servers)}):**\n"
-        for i, name in enumerate(enabled_servers, 1):
-            result += f"{i:2d}. {name}\n"
-        result += "\n"
-    
-    if disabled_servers:
-        result += f"🔴 **Disabled ({len(disabled_servers)}):**\n"
-        for i, name in enumerate(disabled_servers, 1):
-            result += f"{i:2d}. {name}\n"
-    
-    return result
+
 
 @tool
 def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
@@ -1028,12 +991,14 @@ def manage_mcp_config(action: str = "status", server_name: str = None) -> str:
     else:
         return f"❌ Unknown action: {action}. Available actions: status, enable, disable, list_servers, server_status, aws_status"
 
+
+
 @tool
-def list_mcp_tools() -> str:
-    """List all available AgentCore Gateway MCP tools and their descriptions.
+def list_agentcore_gateway_tools() -> str:
+    """List all AgentCore Gateway MCP tools with detailed information including names, descriptions, and parameters.
     
     Returns:
-        Formatted list of AgentCore Gateway MCP tools with descriptions
+        Comprehensive list of AgentCore Gateway MCP tools with full details
     """
     if not mcp_client:
         return "❌ AgentCore Gateway MCP client is not available. No gateway MCP tools are currently accessible."
@@ -1044,24 +1009,88 @@ def list_mcp_tools() -> str:
         if not mcp_tools:
             return "ℹ️  No AgentCore Gateway MCP tools are currently available."
         
-        result = f"🔧 **Available AgentCore Gateway MCP Tools ({len(mcp_tools)} total):**\n\n"
+        result = f"🛠️  **AgentCore Gateway MCP Tools ({len(mcp_tools)} total):**\n\n"
         
         for i, tool in enumerate(mcp_tools, 1):
-            tool_name = getattr(tool, 'name', 'Unknown')
-            tool_description = getattr(tool, 'description', 'No description available')
+            # Try multiple ways to get tool name
+            tool_name = "Unknown"
+            tool_description = "No description available"
             
-            # Try to get input schema if available
-            input_schema = getattr(tool, 'inputSchema', None)
-            parameters = ""
-            if input_schema and hasattr(input_schema, 'properties'):
-                param_names = list(input_schema.properties.keys()) if input_schema.properties else []
-                if param_names:
-                    parameters = f" (Parameters: {', '.join(param_names)})"
+            # Debug: Let's see what attributes the tool object has
+            tool_attrs = [attr for attr in dir(tool) if not attr.startswith('_')]
             
-            result += f"{i}. **{tool_name}**{parameters}\n"
-            result += f"   {tool_description}\n\n"
+            # Try different attribute names for tool name
+            for name_attr in ['name', 'tool_name', 'function_name', '__name__']:
+                if hasattr(tool, name_attr):
+                    name_value = getattr(tool, name_attr)
+                    if name_value and str(name_value) != 'Unknown':
+                        tool_name = str(name_value)
+                        break
+            
+            # Try different attribute names for description
+            for desc_attr in ['description', 'doc', '__doc__', 'help_text']:
+                if hasattr(tool, desc_attr):
+                    desc_value = getattr(tool, desc_attr)
+                    if desc_value and str(desc_value) != 'No description available':
+                        tool_description = str(desc_value)
+                        break
+            
+            # Try to get tool info from _tool_info if it exists (common in MCP tools)
+            if hasattr(tool, '_tool_info'):
+                tool_info = tool._tool_info
+                if hasattr(tool_info, 'name') and tool_info.name:
+                    tool_name = tool_info.name
+                if hasattr(tool_info, 'description') and tool_info.description:
+                    tool_description = tool_info.description
+            
+            # Get input schema details
+            input_schema = None
+            parameters_info = ""
+            
+            # Try different ways to get input schema
+            for schema_attr in ['inputSchema', 'input_schema', 'schema', 'parameters']:
+                if hasattr(tool, schema_attr):
+                    input_schema = getattr(tool, schema_attr)
+                    break
+            
+            # Also try from _tool_info
+            if not input_schema and hasattr(tool, '_tool_info') and hasattr(tool._tool_info, 'inputSchema'):
+                input_schema = tool._tool_info.inputSchema
+            
+            if input_schema:
+                param_details = []
+                
+                # Handle different schema formats
+                properties = None
+                if hasattr(input_schema, 'properties'):
+                    properties = input_schema.properties
+                elif isinstance(input_schema, dict) and 'properties' in input_schema:
+                    properties = input_schema['properties']
+                
+                if properties:
+                    for param_name, param_info in properties.items():
+                        if isinstance(param_info, dict):
+                            param_type = param_info.get('type', 'unknown')
+                            param_desc = param_info.get('description', 'No description')
+                        else:
+                            param_type = 'unknown'
+                            param_desc = str(param_info) if param_info else 'No description'
+                        
+                        param_details.append(f"    • {param_name} ({param_type}): {param_desc}")
+                    
+                    if param_details:
+                        parameters_info = f"\n  Parameters:\n" + "\n".join(param_details)
+            
+            # Show available attributes for debugging (only for first few tools)
+            debug_info = ""
+            if i <= 3:  # Only show for first 3 tools to avoid spam
+                debug_info = f"\n  [Debug - Available attributes: {', '.join(tool_attrs[:10])}{'...' if len(tool_attrs) > 10 else ''}]"
+            
+            result += f"{i:2d}. **{tool_name}**\n"
+            result += f"    Description: {tool_description}{parameters_info}{debug_info}\n\n"
         
-        result += "💡 These tools are available through the AgentCore Gateway integration."
+        result += "💡 Use these tools by calling them directly in your queries to the agent.\n"
+        result += "🔗 These tools are provided through the AgentCore Gateway MCP integration."
         return result
         
     except Exception as e:
@@ -1692,9 +1721,8 @@ def create_tools_list():
     """Create the list of tools for the agent."""
     tools_list = [
         websearch, 
-        list_mcp_tools, 
         list_aws_mcp_tools,
-        list_mcp_server_names,
+        list_agentcore_gateway_tools,
         manage_mcp_config,
         list_mcp_servers_from_config,
         show_available_mcp_servers
@@ -1783,7 +1811,7 @@ class ConversationManager:
             try:
                 mcp_tools = get_full_tools_list(mcp_client)
                 result += f"• {len(mcp_tools)} tools available\n"
-                result += "• Use `list_mcp_tools()` for detailed list\n"
+                result += "• Use `/listagentcoregwtools` command for comprehensive details\n"
             except Exception:
                 result += "• Tools unavailable (connection issue)\n"
         else:
@@ -1831,6 +1859,7 @@ class ConversationManager:
         help_text = "🔧 **Available Commands:**\n\n"
         help_text += "**Special Commands:**\n"
         help_text += "• `/tool` or `/tools` - List all MCP tool sources and status\n"
+        help_text += "• `/listagentcoregwtools` or `/listgwtools` - List AgentCore Gateway MCP tools with details\n"
         help_text += "• `/help` or `/h` - Show this help message\n"
         help_text += "• `exit`, `quit`, `bye` - Exit the agent\n\n"
         
@@ -1838,19 +1867,15 @@ class ConversationManager:
         help_text += "• `websearch()` - Search the web for information\n\n"
         
         help_text += "**AWS MCP Configuration Tools:**\n"
-        help_text += "• `list_mcp_server_names()` - Quick list of AWS MCP server names\n"
         help_text += "• `list_mcp_servers_from_config()` - Detailed AWS MCP server info\n"
         help_text += "• `manage_mcp_config()` - Manage AWS MCP server configuration\n"
         help_text += "• `show_available_mcp_servers()` - Show AWS MCP servers with details\n\n"
         
         help_text += "**MCP Tool Discovery:**\n"
-        help_text += "• `list_mcp_tools()` - List AgentCore Gateway MCP tools\n"
-        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (comprehensive AWS services)\n\n"
+        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (comprehensive AWS services)\n"
+        help_text += "• Use `/listagentcoregwtools` command for AgentCore Gateway MCP tools\n\n"
         
-        help_text += "**AWS Operations:**\n"
-        help_text += "• All AWS operations are provided via MCP tools\n"
-        help_text += "• VPC, EC2, S3, EKS, CloudWatch, and 50+ AWS services\n"
-        help_text += "• Use `list_aws_mcp_tools()` to see available AWS operations\n\n"
+
         
         help_text += "💡 **MCP Tool Sources:**\n"
         help_text += f"• AgentCore Gateway: {'� ConnCected' if mcp_client else '🔴 Disconnected'} (ENABLE_MCP_CONFIG)\n"
@@ -1889,6 +1914,11 @@ class ConversationManager:
                     if user_input.lower() in ["/tool", "/tools"]:
                         tool_list = self._list_all_mcp_tools()
                         print(f"\n{self.bot_name} > {tool_list}")
+                        continue
+                    elif user_input.lower() in ["/listagentcoregwtools", "/listgwtools"]:
+                        # Call the tool function directly
+                        gateway_tools = list_agentcore_gateway_tools()
+                        print(f"\n{self.bot_name} > {gateway_tools}")
                         continue
                     elif user_input.lower() in ["/help", "/h"]:
                         help_text = self._show_help()

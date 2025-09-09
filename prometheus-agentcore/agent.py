@@ -1077,6 +1077,109 @@ def list_mcp_tools() -> str:
         return f"❌ Error retrieving AgentCore Gateway MCP tools: {str(e)}"
 
 @tool
+def list_agentcore_gateway_tools() -> str:
+    """List all AgentCore Gateway MCP tools with detailed information including names, descriptions, and parameters.
+    
+    Returns:
+        Comprehensive list of AgentCore Gateway MCP tools with full details
+    """
+    if not mcp_client:
+        return "❌ AgentCore Gateway MCP client is not available. No gateway MCP tools are currently accessible."
+    
+    try:
+        mcp_tools = get_full_tools_list(mcp_client)
+        
+        if not mcp_tools:
+            return "ℹ️  No AgentCore Gateway MCP tools are currently available."
+        
+        result = f"🛠️  **AgentCore Gateway MCP Tools ({len(mcp_tools)} total):**\n\n"
+        
+        for i, tool in enumerate(mcp_tools, 1):
+            # Try multiple ways to get tool name
+            tool_name = "Unknown"
+            tool_description = "No description available"
+            
+            # Debug: Let's see what attributes the tool object has
+            tool_attrs = [attr for attr in dir(tool) if not attr.startswith('_')]
+            
+            # Try different attribute names for tool name
+            for name_attr in ['name', 'tool_name', 'function_name', '__name__']:
+                if hasattr(tool, name_attr):
+                    name_value = getattr(tool, name_attr)
+                    if name_value and str(name_value) != 'Unknown':
+                        tool_name = str(name_value)
+                        break
+            
+            # Try different attribute names for description
+            for desc_attr in ['description', 'doc', '__doc__', 'help_text']:
+                if hasattr(tool, desc_attr):
+                    desc_value = getattr(tool, desc_attr)
+                    if desc_value and str(desc_value) != 'No description available':
+                        tool_description = str(desc_value)
+                        break
+            
+            # Try to get tool info from _tool_info if it exists (common in MCP tools)
+            if hasattr(tool, '_tool_info'):
+                tool_info = tool._tool_info
+                if hasattr(tool_info, 'name') and tool_info.name:
+                    tool_name = tool_info.name
+                if hasattr(tool_info, 'description') and tool_info.description:
+                    tool_description = tool_info.description
+            
+            # Get input schema details
+            input_schema = None
+            parameters_info = ""
+            
+            # Try different ways to get input schema
+            for schema_attr in ['inputSchema', 'input_schema', 'schema', 'parameters']:
+                if hasattr(tool, schema_attr):
+                    input_schema = getattr(tool, schema_attr)
+                    break
+            
+            # Also try from _tool_info
+            if not input_schema and hasattr(tool, '_tool_info') and hasattr(tool._tool_info, 'inputSchema'):
+                input_schema = tool._tool_info.inputSchema
+            
+            if input_schema:
+                param_details = []
+                
+                # Handle different schema formats
+                properties = None
+                if hasattr(input_schema, 'properties'):
+                    properties = input_schema.properties
+                elif isinstance(input_schema, dict) and 'properties' in input_schema:
+                    properties = input_schema['properties']
+                
+                if properties:
+                    for param_name, param_info in properties.items():
+                        if isinstance(param_info, dict):
+                            param_type = param_info.get('type', 'unknown')
+                            param_desc = param_info.get('description', 'No description')
+                        else:
+                            param_type = 'unknown'
+                            param_desc = str(param_info) if param_info else 'No description'
+                        
+                        param_details.append(f"    • {param_name} ({param_type}): {param_desc}")
+                    
+                    if param_details:
+                        parameters_info = f"\n  Parameters:\n" + "\n".join(param_details)
+            
+            # Show available attributes for debugging (only for first few tools)
+            debug_info = ""
+            if i <= 3:  # Only show for first 3 tools to avoid spam
+                debug_info = f"\n  [Debug - Available attributes: {', '.join(tool_attrs[:10])}{'...' if len(tool_attrs) > 10 else ''}]"
+            
+            result += f"{i:2d}. **{tool_name}**\n"
+            result += f"    Description: {tool_description}{parameters_info}{debug_info}\n\n"
+        
+        result += "💡 Use these tools by calling them directly in your queries to the agent.\n"
+        result += "🔗 These tools are provided through the AgentCore Gateway MCP integration."
+        return result
+        
+    except Exception as e:
+        return f"❌ Error retrieving AgentCore Gateway MCP tools: {str(e)}"
+
+@tool
 def list_aws_mcp_tools() -> str:
     """List all available AWS MCP tools and their descriptions.
     
@@ -1730,9 +1833,8 @@ def create_tools_list():
     """Create the list of tools for the agent."""
     tools_list = [
         websearch, 
-        list_mcp_tools, 
         list_aws_mcp_tools,
-        list_mcp_server_names,
+        list_agentcore_gateway_tools,
         manage_mcp_config,
         list_mcp_servers_from_config,
         show_available_mcp_servers
@@ -1806,34 +1908,61 @@ class ConversationManager:
         self.exit_commands = {'exit', 'quit', 'bye'}
     
     def _list_all_mcp_tools(self) -> str:
-        """List all MCP tools loaded from the configuration file."""
-        if not AgentConfig.ENABLE_MCP_CONFIG:
-            return "❌ MCP configuration disabled"
+        """List all MCP tools and tool sources available to the agent."""
+        result = "🔧 **Available Tools & Sources:**\n\n"
         
-        servers = AgentConfig.get_mcp_servers()
-        if not servers:
-            return "ℹ️  No MCP servers found"
+        # Built-in tools
+        result += "**Built-in Tools:**\n"
+        result += "• websearch - Web search using DuckDuckGo\n"
+        result += "• MCP configuration management tools (5 tools)\n\n"
         
-        enabled_servers = []
-        disabled_servers = []
+        # AgentCore Gateway MCP tools
+        gateway_status = "🟢 Connected" if mcp_client else "🔴 Disconnected"
+        result += f"**AgentCore Gateway MCP:** {gateway_status}\n"
+        if mcp_client:
+            try:
+                mcp_tools = get_full_tools_list(mcp_client)
+                result += f"• {len(mcp_tools)} tools available\n"
+                result += "• Use `/listagentcoregwtools` command for comprehensive details\n"
+            except Exception:
+                result += "• Tools unavailable (connection issue)\n"
+        else:
+            result += "• No tools available (not connected)\n"
+        result += "\n"
         
-        for name, config in servers.items():
-            # Extract clean server name
-            clean_name = name.replace('awslabs.', '').replace('-mcp-server', '').replace('-mcp', '')
+        # AWS MCP tools
+        aws_status = "🟢 Enabled" if aws_mcp_manager else "🔴 Disabled"
+        result += f"**AWS Comprehensive MCP:** {aws_status}\n"
+        if aws_mcp_manager:
+            try:
+                aws_tools = aws_mcp_manager.get_all_aws_tools()
+                result += f"• {len(aws_tools)} AWS tools available\n"
+                result += "• Covers 50+ AWS services (Prometheus, CloudWatch, VPC, etc.)\n"
+                result += "• Use `list_aws_mcp_tools()` for detailed list\n"
+            except Exception:
+                result += "• Tools unavailable (connection issue)\n"
+        else:
+            result += "• No AWS tools available (disabled)\n"
+        result += "\n"
+        
+        # MCP Configuration Status
+        result += "**MCP Configuration:**\n"
+        if AgentConfig.ENABLE_MCP_CONFIG:
+            result += "• AgentCore Gateway MCP: Enabled (tools from gateway)\n"
+        else:
+            result += "• AgentCore Gateway MCP: Disabled\n"
             
-            if config.get('disabled', False):
-                disabled_servers.append(clean_name)
+        if AgentConfig.ENABLE_AWS_MCP:
+            # Only check config file for AWS MCP servers
+            servers = AgentConfig.get_mcp_servers()
+            if servers:
+                enabled_count = sum(1 for config in servers.values() if not config.get('disabled', False))
+                result += f"• AWS MCP servers: {enabled_count}/{len(servers)} enabled\n"
+                result += "• Use `show_available_mcp_servers()` for server details\n"
             else:
-                enabled_servers.append(clean_name)
-        
-        result = f"🔧 **MCP Tools ({len(enabled_servers)} enabled):**\n"
-        
-        # Show enabled servers in a compact list
-        for i, name in enumerate(enabled_servers, 1):
-            result += f"{i:2d}. {name}\n"
-        
-        if disabled_servers:
-            result += f"\n🔴 **Disabled ({len(disabled_servers)}):** {', '.join(disabled_servers)}"
+                result += "• AWS MCP servers: No config file found\n"
+        else:
+            result += "• AWS MCP servers: Disabled\n"
         
         return result
     
@@ -1841,29 +1970,34 @@ class ConversationManager:
         """Show available commands and help information."""
         help_text = "🔧 **Available Commands:**\n\n"
         help_text += "**Special Commands:**\n"
-        help_text += "• `/tool` or `/tools` - List all MCP tools from configuration\n"
+        help_text += "• `/tool` or `/tools` - List all MCP tool sources and status\n"
+        help_text += "• `/listagentcoregwtools` or `/listgwtools` - List AgentCore Gateway MCP tools with details\n"
         help_text += "• `/help` or `/h` - Show this help message\n"
         help_text += "• `exit`, `quit`, `bye` - Exit the agent\n\n"
         
-        help_text += "**MCP Management Tools:**\n"
-        help_text += "• `list_mcp_server_names()` - Quick list of server names\n"
-        help_text += "• `list_mcp_servers_from_config()` - Detailed server info\n"
-        help_text += "• `manage_mcp_config()` - Manage MCP configuration\n"
-        help_text += "• `show_available_mcp_servers()` - Show servers with details\n\n"
-        
-        help_text += "**MCP Tools:**\n"
-        help_text += "• `list_mcp_tools()` - List AgentCore Gateway MCP tools\n"
-        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (AWS services)\n\n"
-        
-        help_text += "**Other Tools:**\n"
+        help_text += "**Built-in Tools:**\n"
         help_text += "• `websearch()` - Search the web for information\n\n"
         
-        help_text += "💡 **Tips:**\n"
-        help_text += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'}\n"
-        help_text += f"• AWS MCP Integration: {'🟢 Enabled' if aws_mcp_manager else '🔴 Disabled'}\n"
-        help_text += f"• Available MCP Servers: {len(AgentConfig.get_mcp_servers())}\n"
-        help_text += "• All AWS operations use MCP tools exclusively\n"
-        help_text += "• Ask me anything about Prometheus, monitoring, or AWS!"
+        help_text += "**AWS MCP Configuration Tools:**\n"
+        help_text += "• `list_mcp_servers_from_config()` - Detailed AWS MCP server info\n"
+        help_text += "• `manage_mcp_config()` - Manage AWS MCP server configuration\n"
+        help_text += "• `show_available_mcp_servers()` - Show AWS MCP servers with details\n\n"
+        
+        help_text += "**MCP Tool Discovery:**\n"
+        help_text += "• `list_aws_mcp_tools()` - List AWS MCP tools (comprehensive AWS services)\n"
+        help_text += "• Use `/listagentcoregwtools` command for AgentCore Gateway MCP tools\n\n"
+        
+        help_text += "💡 **MCP Tool Sources:**\n"
+        help_text += f"• AgentCore Gateway: {'🟢 Connected' if mcp_client else '🔴 Disconnected'} (ENABLE_MCP_CONFIG)\n"
+        help_text += f"• AWS MCP: {'🟢 Enabled' if aws_mcp_manager else '🔴 Disabled'} (ENABLE_AWS_MCP)\n"
+        
+        # Only show server count for AWS MCP (which uses config file)
+        if AgentConfig.ENABLE_AWS_MCP:
+            server_count = len(AgentConfig.get_mcp_servers())
+            help_text += f"• AWS MCP Servers: {server_count} configured\n"
+        help_text += "\n"
+        help_text += "📊 **Prometheus Expertise:**\n"
+        help_text += "• Ask me anything about Prometheus, monitoring, observability, or AWS!"
         
         return help_text
     
@@ -1890,6 +2024,11 @@ class ConversationManager:
                     if user_input.lower() in ["/tool", "/tools"]:
                         tool_list = self._list_all_mcp_tools()
                         print(f"\n{self.bot_name} > {tool_list}")
+                        continue
+                    elif user_input.lower() in ["/listagentcoregwtools", "/listgwtools"]:
+                        # Call the tool function directly
+                        gateway_tools = list_agentcore_gateway_tools()
+                        print(f"\n{self.bot_name} > {gateway_tools}")
                         continue
                     elif user_input.lower() in ["/help", "/h"]:
                         help_text = self._show_help()

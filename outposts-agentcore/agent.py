@@ -73,7 +73,7 @@ class AWSMCPManager:
         """Load AWS MCP configuration."""
         try:
             if not os.path.exists(self.config_path):
-                print(f"⚠️  AWS MCP config file not found at {self.config_path}")
+                print(f"ℹ️  AWS MCP config file not found - Bedrock AgentCore Gateway MCP tools will be used")
                 return None
                 
             with open(self.config_path, 'r') as f:
@@ -114,7 +114,7 @@ class AWSMCPManager:
                 print(f"⚠️  Failed to initialize {server_name}: {e}")
     
     def _initialize_single_mcp_client(self, server_name: str, server_config: dict):
-        """Initialize a single MCP client with timeout."""
+        """Initialize a single MCP client with improved timeout handling."""
         command = server_config.get('command', '')
         args = server_config.get('args', [])
         env = server_config.get('env', {})
@@ -123,79 +123,99 @@ class AWSMCPManager:
             print(f"⚠️  No command specified for {server_name}")
             return
         
+        try:
+            # Create environment with current env + server env
+            full_env = os.environ.copy()
+            
+            # Ensure AWS region is set for all AWS MCP servers
+            if 'aws' in server_name.lower() or any('aws' in arg.lower() for arg in args):
+                full_env.setdefault('AWS_DEFAULT_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
+                full_env.setdefault('AWS_REGION', os.environ.get('AWS_REGION', 'us-east-1'))
+            
+            # Apply server-specific environment variables
+            full_env.update(env)
+            
+            # Add additional logging suppression for all MCP servers
+            full_env.setdefault('PYTHONWARNINGS', 'ignore')
+            full_env.setdefault('LOGURU_LEVEL', 'ERROR')
+            full_env.setdefault('LOG_LEVEL', 'ERROR')
+            
+            # Create MCP client
+            server_params = StdioServerParameters(
+                command=command,
+                args=args,
+                env=full_env
+            )
+            client = MCPClient(
+                lambda: stdio_client(server_params)
+            )
+            
+            print(f"   • Starting {server_name}...")
+            
+            # Start the client
+            client.start()
+            
+            # Get tools from this client with timeout
+            tools = self._get_tools_from_client_with_timeout(client, server_name)
+            
+            if tools is not None:  # None means timeout, empty list means no tools
+                self.mcp_clients[server_name] = client
+                self.mcp_tools.extend(tools)
+                print(f"✅ Initialized {server_name} with {len(tools)} tools")
+            else:
+                # Timeout occurred, cleanup client
+                try:
+                    client.stop(None, None, None)
+                except:
+                    pass
+                print(f"⚠️  {server_name} tool retrieval timed out, skipping...")
+                
+        except Exception as e:
+            print(f"⚠️  Failed to start {server_name}: {e}")
+            return
+    
+    def _get_tools_from_client_with_timeout(self, client, server_name: str, timeout: float = 10.0):
+        """Get tools from an MCP client with timeout."""
         import threading
         import time
         
-        def init_client_worker():
-            """Worker function to initialize client."""
+        result = {'tools': None, 'error': None}
+        
+        def get_tools_worker():
+            """Worker function to get tools."""
             try:
-                # Create environment with current env + server env
-                full_env = os.environ.copy()
-                
-                # Ensure AWS region is set for all AWS MCP servers
-                if 'aws' in server_name.lower() or any('aws' in arg.lower() for arg in args):
-                    full_env.setdefault('AWS_DEFAULT_REGION', os.environ.get('AWS_DEFAULT_REGION', 'us-east-1'))
-                    full_env.setdefault('AWS_REGION', os.environ.get('AWS_REGION', 'us-east-1'))
-                
-                # Apply server-specific environment variables
-                full_env.update(env)
-                
-                # Add additional logging suppression for all MCP servers
-                full_env.setdefault('PYTHONWARNINGS', 'ignore')
-                full_env.setdefault('LOGURU_LEVEL', 'ERROR')
-                full_env.setdefault('LOG_LEVEL', 'ERROR')
-                
-                # Create MCP client using stdio
-                server_params = StdioServerParameters(
-                    command=command,
-                    args=args,
-                    env=full_env
-                )
-                client = MCPClient(
-                    lambda: stdio_client(server_params)
-                )
-                
-                print(f"   • Starting {server_name}...")
-                
-                # Start the client (this can hang)
-                client.start()
-                
-                # Get tools from this client
-                tools = self._get_tools_from_client(client, server_name)
-                
-                self.mcp_clients[server_name] = client
-                self.mcp_tools.extend(tools)
-                
-                print(f"✅ Initialized {server_name} with {len(tools)} tools")
-                return True
-                
+                tools = client.list_tools_sync()
+                result['tools'] = tools
             except Exception as e:
-                print(f"⚠️  Failed to start {server_name}: {e}")
-                return False
+                result['error'] = e
         
-        # Use different timeouts based on server type
-        problematic_servers = {
-            'awslabs.prometheus-mcp-server',
-            'aws-knowledge-mcp-server', 
-            'awslabs.cloudwatch-mcp-server'
-        }
+        # Run tool retrieval with timeout
+        worker_thread = threading.Thread(target=get_tools_worker, daemon=True)
+        worker_thread.start()
+        worker_thread.join(timeout=timeout)
         
-        timeout = 2.0 if server_name in problematic_servers else 5.0
+        if worker_thread.is_alive():
+            # Timeout occurred
+            return None
         
-        # Run initialization with timeout
-        init_thread = threading.Thread(target=init_client_worker, daemon=True)
-        init_thread.start()
-        init_thread.join(timeout=timeout)
+        if result['error']:
+            # Handle errors
+            error_str = str(result['error']).lower()
+            if "validation error" in error_str and "tools" in error_str:
+                print(f"ℹ️  {server_name}: No tools available")
+            elif "connection" in error_str or "timeout" in error_str:
+                print(f"ℹ️  {server_name}: Connection unavailable")
+            else:
+                print(f"ℹ️  {server_name}: Tools unavailable ({result['error']})")
+            return []
         
-        if init_thread.is_alive():
-            print(f"⚠️  {server_name} initialization timed out after {timeout}s, skipping...")
-            return
+        # Process successful response
+        tools = result['tools']
+        return self._process_tools_response(tools, server_name)
     
-    def _get_tools_from_client(self, client, server_name: str):
-        """Get tools from an MCP client."""
+    def _process_tools_response(self, tools, server_name: str):
+        """Process tools response and add server attribution."""
         try:
-            tools = client.list_tools_sync()
-            
             # Handle different response formats
             if isinstance(tools, dict):
                 # Check if it's a valid tools response with 'tools' field
@@ -213,25 +233,45 @@ class AWSMCPManager:
                 print(f"⚠️  {server_name} returned unexpected format: {type(tools)}")
                 return []
             
-            # Add server name prefix to tool names for identification
+            # Add server name attribution to tools
             if tools_list:
                 for tool in tools_list:
-                    if hasattr(tool, 'name'):
-                        tool._original_name = tool.name
+                    # Try different ways to set server name based on tool type
+                    try:
+                        if hasattr(tool, 'name'):
+                            tool._original_name = getattr(tool, 'name', 'unknown')
                         tool._server_name = server_name
+                        
+                        # For MCPAgentTool objects, try to set additional attributes
+                        if hasattr(tool, '_tool_info'):
+                            if hasattr(tool._tool_info, 'name'):
+                                tool._original_name = tool._tool_info.name
+                        
+                        # Try to access the underlying tool name through different paths
+                        if not hasattr(tool, '_original_name') or not tool._original_name:
+                            if hasattr(tool, '_name'):
+                                tool._original_name = tool._name
+                            elif hasattr(tool, 'tool_name'):
+                                tool._original_name = tool.tool_name
+                            else:
+                                tool._original_name = f"tool_from_{server_name}"
+                                
+                    except Exception as attr_error:
+                        # If attribution fails, continue but log it
+                        print(f"⚠️  Could not set attributes for tool from {server_name}: {attr_error}")
+                        tool._server_name = server_name
+                        tool._original_name = f"tool_from_{server_name}"
+                
                 return tools_list
             return []
             
         except Exception as e:
-            # Provide cleaner error messages for common MCP issues
-            error_str = str(e).lower()
-            if "validation error" in error_str and "tools" in error_str:
-                print(f"ℹ️  {server_name}: No tools available")
-            elif "connection" in error_str or "timeout" in error_str:
-                print(f"ℹ️  {server_name}: Connection unavailable")
-            else:
-                print(f"ℹ️  {server_name}: Tools unavailable")
+            print(f"⚠️  Error processing tools from {server_name}: {e}")
             return []
+    
+    def _get_tools_from_client(self, client, server_name: str):
+        """Get tools from an MCP client (legacy method for compatibility)."""
+        return self._get_tools_from_client_with_timeout(client, server_name)
     
     def get_all_aws_tools(self):
         """Get all tools from AWS MCP clients."""
@@ -1695,8 +1735,14 @@ def create_tools_list():
                 print("ℹ️  No AWS MCP tools available")
             elif "connection" in error_str or "timeout" in error_str:
                 print("ℹ️  AWS MCP server connection unavailable")
+            elif "'nonetype' object has no attribute" in error_str:
+                print("⚠️  AWS MCP initialization failed: AWS MCP manager not properly initialized")
+                print("🔄 Continuing without AWS MCP functionality...")
             else:
-                print("ℹ️  AWS MCP tools unavailable")
+                print(f"⚠️  AWS MCP initialization failed: {e}")
+                print("🔄 Continuing without AWS MCP functionality...")
+    else:
+        print("ℹ️  AWS MCP manager not available")
     
     return tools_list
 
@@ -1964,49 +2010,34 @@ def initialize_agent():
             print("🔄 Continuing without MCP client functionality...")
             mcp_client = None
 
-    # Initialize AWS MCP Manager with timeout
+    # Initialize AWS MCP Manager using the reliable sequential approach
     aws_mcp_manager = None
     if AgentConfig.ENABLE_AWS_MCP:
-        import threading
-        import time
-        
-        def init_aws_mcp():
-            """Initialize AWS MCP Manager."""
-            global aws_mcp_manager
+        try:
+            print("🔧 Initializing AWS MCP integration...")
+            
+            # Verify AWS region is properly configured before MCP initialization
+            current_region = os.environ.get('AWS_DEFAULT_REGION', 'not-set')
+            print(f"   • AWS region: {current_region}")
+            
+            # Verify AWS credentials are available
             try:
-                print("🔧 Initializing AWS MCP integration...")
-                
-                # Verify AWS region is properly configured before MCP initialization
-                current_region = os.environ.get('AWS_DEFAULT_REGION', 'not-set')
-                print(f"   • AWS region: {current_region}")
-                
-                # Verify AWS credentials are available
-                try:
-                    session = Session()
-                    credentials = session.get_credentials()
-                    if credentials is None:
-                        raise Exception("No AWS credentials found")
-                    print(f"   • AWS credentials: ✅ Available")
-                except Exception as cred_error:
-                    print(f"   • AWS credentials: ❌ {cred_error}")
-                    raise Exception(f"AWS credentials not available: {cred_error}")
-                
-                aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
-                aws_mcp_manager.initialize_aws_mcp_clients()
-                aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
-                print(f"✅ AWS MCP integration ready with {aws_tools_count} tools")
-            except Exception as e:
-                print(f"⚠️  AWS MCP initialization failed: {e}")
-                print("🔄 Continuing without AWS MCP functionality...")
-                aws_mcp_manager = None
-        
-        # Run AWS MCP initialization with timeout
-        init_thread = threading.Thread(target=init_aws_mcp, daemon=True)
-        init_thread.start()
-        init_thread.join(timeout=15.0)  # 15 second timeout
-        
-        if init_thread.is_alive():
-            print("⚠️  AWS MCP initialization timed out after 15s, continuing without it...")
+                session = boto3.Session()
+                credentials = session.get_credentials()
+                if credentials is None:
+                    raise Exception("No AWS credentials found")
+                print(f"   • AWS credentials: ✅ Available")
+            except Exception as cred_error:
+                print(f"   • AWS credentials: ❌ {cred_error}")
+                raise Exception(f"AWS credentials not available: {cred_error}")
+            
+            aws_mcp_manager = AWSMCPManager(AgentConfig.AWS_MCP_CONFIG_PATH)
+            aws_mcp_manager.initialize_aws_mcp_clients()
+            aws_tools_count = len(aws_mcp_manager.get_all_aws_tools())
+            print(f"✅ Added {aws_tools_count} AWS MCP tools")
+        except Exception as e:
+            print(f"⚠️  AWS MCP initialization failed: {e}")
+            print("🔄 Continuing without AWS MCP functionality...")
             aws_mcp_manager = None
     else:
         print("ℹ️  AWS MCP integration disabled")
@@ -2097,8 +2128,7 @@ def setup_gateway_and_mcp():
             )
             print("✅ MCP client configured successfully")
             
-            # Initialize AWS MCP Manager
-            aws_mcp_manager = AWSMCPManager(mcp_client)
+            # AWS MCP Manager will be initialized after MCP client is started
             
         except Exception as e:
             print(f"⚠️  MCP client setup failed: {e}")
